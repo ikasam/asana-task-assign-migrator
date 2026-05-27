@@ -2,12 +2,11 @@
 //
 // Pipeline:
 //   1. pre-checks (workspace, from user, to user, to-membership)
-//   2. task discovery (paginated getTasks)
-//   3. subtask augmentation (if needed — controlled by SubtaskMode)
-//   4. idempotency filter (drop tasks already assigned to `to`)
-//   5. confirmation prompt (unless --yes or --dry-run)
-//   6. execution (serial updateTask via rate limiter)
-//   7. reporting (renderer.summary / renderer.jsonPayload)
+//   2. task discovery (paginated getTasks — surfaces subtasks too, see H-DOM3)
+//   3. idempotency filter (drop tasks already assigned to `to`)
+//   4. confirmation prompt (unless --yes or --dry-run)
+//   5. execution (serial updateTask via rate limiter)
+//   6. reporting (renderer.summary / renderer.jsonPayload)
 //
 // All Asana SDK contact is funneled through AsanaClient (asana_client.ts), and all
 // network calls are wrapped by the rate-limiter runner. This module is pure
@@ -39,24 +38,16 @@ export class PreCheckError extends Error {
   }
 }
 
-// SubtaskMode controls H-DOM3 fallback.
-//   "auto": rely on getTasks to surface subtasks (current assumption).
-//   "expand": after discovery, walk each task's subtasks recursively and merge.
-// Selected at runtime once spike findings land.
-export type SubtaskMode = "auto" | "expand";
-
 export interface RunMigrationOpts {
   args: CliArgs;
   client: AsanaClient;
   renderer: Renderer;
-  subtaskMode?: SubtaskMode;
   // Injectable for tests; defaults to interactive stdin prompt.
   promptConfirm?: (message: string) => boolean;
 }
 
 export async function runMigration(opts: RunMigrationOpts): Promise<ExitCode> {
   const { args, client, renderer } = opts;
-  const subtaskMode: SubtaskMode = opts.subtaskMode ?? "auto";
 
   const run = createThrottledRunner({
     detectRateLimit: defaultRateLimitDetector,
@@ -71,13 +62,10 @@ export async function runMigration(opts: RunMigrationOpts): Promise<ExitCode> {
 
   renderer.banner(args, workspace, fromUser, { ...toUser, isMember: true });
 
-  // [Task discovery]
+  // [Task discovery] — H-DOM3 採択済み: getTasks のレスポンスに subtask も含まれるため、
+  // /tasks/{gid}/subtasks の追加走査は不要。
   renderer.discoveryStart(fromUser.email);
-  let tasks = await run(() => client.listAssignedIncompleteTasks(workspace.gid, fromUser.gid));
-
-  if (subtaskMode === "expand") {
-    tasks = await expandSubtasks(client, run, tasks, fromUser.gid);
-  }
+  const tasks = await run(() => client.listAssignedIncompleteTasks(workspace.gid, fromUser.gid));
 
   // [Idempotency filter] — S-013
   const filtered = tasks.filter((t) => t.assigneeGid !== toUser.gid);
@@ -195,31 +183,6 @@ async function preCheckMembership(
       "Ask a workspace admin to invite the new account before re-running.",
     );
   }
-}
-
-async function expandSubtasks(
-  client: AsanaClient,
-  run: <T>(fn: () => Promise<T>) => Promise<T>,
-  seeds: AsanaTask[],
-  fromUserGid: string,
-): Promise<AsanaTask[]> {
-  // BFS over subtask tree, keeping only nodes assigned to from-user.
-  // Deduplicates by gid in case getTasks already surfaced some subtasks.
-  const seen = new Map<string, AsanaTask>();
-  for (const t of seeds) seen.set(t.gid, t);
-
-  const queue: string[] = seeds.map((t) => t.gid);
-  while (queue.length) {
-    const parent = queue.shift()!;
-    const subs = await run(() => client.listSubtasks(parent));
-    for (const s of subs) {
-      if (s.assigneeGid !== fromUserGid) continue;
-      if (seen.has(s.gid)) continue;
-      seen.set(s.gid, s);
-      queue.push(s.gid);
-    }
-  }
-  return Array.from(seen.values());
 }
 
 async function executeOne(
