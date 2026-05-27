@@ -1,6 +1,6 @@
 # 06 — 判断履歴
 
-対話中に明示的に分岐させた判断（判断 1 〜 22）の記録。各判断について「選択肢 / 採択 / 理由」を残す。
+対話中に明示的に分岐させた判断（判断 1 〜 24）の記録。各判断について「選択肢 / 採択 / 理由」を残す。
 
 ## 判断 1: 「すべての未完了タスク」の境界
 
@@ -113,7 +113,8 @@
 - **選択肢**: A 含める / B 除外
 - **採択**: **A**
 - **理由**: 「旧アカウントが assignee の未完了タスクすべて」というユースケース文に忠実。subtask は親と独立した assignee を持つため、放置すると移行漏れ。
-- **関連**: R1, H-DOM3
+- **実装方針の変遷**: 当初は H-DOM3 が偽だった場合の fallback として `SubtaskMode = "auto" | "expand"` 型と `expandSubtasks` / `listSubtasks` の BFS 実装をコードに残していたが、2026-05-28 のライブ本実行で H-DOM3 が採択され（subtask 2 件が `getTasks` のレスポンスに含まれることを overlap=2/2 で確認）、判断 24 のテスト戦略（短命ツール・YAGNI）に従って fallback コードは削除した。万一 Asana API の挙動が変わり subtask が `getTasks` から外れたら再実装する。
+- **関連**: R1, H-DOM3, 判断 24
 
 ## 判断 17: 仕様候補ドラフト v1 の確定
 
@@ -163,6 +164,20 @@
 - **理由**: `asana@3.1.11` の型定義は OpenAPI 自動生成で、戻り値は `Promise<any>` や `Promise<Collection | any>` 程度しか提供されない（`data: any[]` 経由で実データに辿り着く）。当初 `project_tech_stack.md` で期待していた「SDK で型補完を得つつ」という動機は SDK 側だけでは達成不能。`asana_client.ts` のファサードで app 側型を `types.ts` に正規化することで、migrator / output / tests は SDK の `any` を一切触らずに済むよう設計した。
 - **副作用**: ファサード層自体は `any` を内包する。`// deno-lint-ignore no-explicit-any` を局所的に許可している。
 - **関連**: H-DENO1, `src/asana_client.ts`, `src/types.ts`, [project_tech_stack の懸念点 C4「OpenAPI 自動生成の冗長 API — 内部にファサードを置けば呼び出し側は綺麗」]
+
+## 判断 24: テスト戦略 — モック非導入、live spike で検証
+
+- **選択肢**: A 全層を mock で unit テスト / B 外部 API 非依存の層のみ unit テスト + `asana_client.ts` と `migrator.ts` は live spike で検証 / C 全層を live integration テスト
+- **採択**: **B**
+- **理由**:
+  - 本ツールは Asana 企業ドメイン制約の回避策で、Asana 側の修正で不要になる短命前提（[00_overview.md](00_overview.md)）。長期メンテを支える testing harness 投資は過剰。
+  - mock/prod 乖離はユーザの強い回避対象（プロジェクト共通ポリシー）。`updateTask` の body 形状や `getTasks` のページネーション等、SDK 側の挙動を mock で写すと整合性が崩れた瞬間に prod で初めて気付く事故になる。
+  - Phase 2 spike（`spike/phase2_api.ts`）+ ライブ本実行（37/37 success）+ 冪等再実行（`Found 0 tasks`）で `asana_client.ts` / `migrator.ts` の主要パスはカバー済み。
+- **何をテストし、何をテストしないか**:
+  - **unit テスト対象**: `output.ts`（フォーマッタ）、`rate_limiter.ts`（タイマー・再試行ロジック）、`cli.ts`（引数パーサ）など外部 I/O を持たない pure ロジック。
+  - **テスト対象外**: `asana_client.ts`（SDK ファサード）、`migrator.ts`（pipeline）、`main.ts`（lazy import 経路）。SDK 挙動依存の層は live spike で代替。
+- **回帰検出**: `deno check` + `deno lint` + `deno fmt` を必須ゲートとし、SDK API シグネチャ変更は型エラーで検知。`npm:asana@3.x` の minor バージョンを `deno.lock` でピン留め。
+- **関連**: [02_hypotheses.md](02_hypotheses.md)（live で採択した H-API4/5/6, H-DOM3, H-DENO2/3）、判断 7（SDK 採用）、判断 9（スパイク優先）
 
 ---
 

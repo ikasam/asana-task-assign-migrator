@@ -63,7 +63,7 @@
 | H-API5 | `getTasks` が Free プランでも動く | ✓ 採択 (2026-05-28) |
 | H-API6 | `getUserForWorkspace` が非メンバーで 404 を返す | ✓ 採択 (2026-05-28、検証 workspace の非メンバー email で 404 観測) |
 | H-DENO2 | superagent 経由で `err.response.headers` が読める (Retry-After 含む) | ✓ 採択 (2026-05-28、404 ケースで header object 観測。429 実観測時に最終確認) |
-| H-DOM3 | subtask が `getTasks` のレスポンスに含まれる | ✓ 採択 (2026-05-28、検証用 parent task の subtask 2 件が当該 assignee の `getTasks` 結果に含まれ overlap=2/2) → `subtaskMode='auto'` で安全。`'expand'` は fallback コードのみ |
+| H-DOM3 | subtask が `getTasks` のレスポンスに含まれる | ✓ 採択 (2026-05-28、検証用 parent task の subtask 2 件が当該 assignee の `getTasks` 結果に含まれ overlap=2/2)。fallback コード (`SubtaskMode` / `listSubtasks` / `expandSubtasks`) は YAGNI で削除済み (判断 24) |
 | H-DENO3 | `deno compile` で `npm:asana` を含む単一バイナリが生成・実行できる | ✓ 採択 (2026-05-28、92 MB バイナリ生成、実 API pre-check まで動作) |
 
 ## 強い制約
@@ -104,19 +104,21 @@
 - **completed_since=now**: Asana `/tasks` API のイディオム。「現在時点で未完了のタスクのみ」を取得する。
 - **subtask**: 親タスクを持つタスク。`assignee` は親と独立。
 - **冪等性 (R6)**: 同じ引数で再実行しても、既に新アカウントが assignee のタスクは対象外として扱う。失敗分のリカバリが安全。
+  - **主用途は「リトライ時の重複更新防止」**。1 回目の本実行で一部失敗が出たケースで、成功済み task に対する 2 回目以降の `updateTask` 呼び出しを避け、無駄な API consume を抑える狙い。
+  - 「from と to に同じユーザーが assign された task の検知」用途ではない（pre-checks で `from != to` を弾くので、両者が同一 user の状況は発生し得ない）。
 
 ## 後工程で忘れると危険な文脈
 
 1. **`@babel/cli` がランタイム依存に紛れ込んでいる** — `npm:asana@3` の package.json バグ。バイナリサイズに影響する可能性。`deno compile` で問題化したら、独自 fetch クライアントへの切替を検討。
 2. **`searchTasksForWorkspace` を使わない判断** — SDK には存在するが、eventual consistency と非標準ページネーションのため `getTasks` を必ず使う。誤って search を使うと dry-run と本実行の整合性が崩れる。
-3. **`assignee` の更新は単一フィールド更新** — `updateTask({data:{assignee:to_gid}}, task_gid)`。`name` や他フィールドを誤って渡さない。
+3. **`assignee` の更新は単一フィールド更新** — `updateTask({data:{assignee:to_gid}}, task_gid)`。`name` や他フィールドを誤って渡さない。`opt_fields` 省略時の挙動 / subtask 更新時の parent 副作用 / `assignee:null` 解除は未検証（[03_specifications.md の「S-012 補足」](03_specifications.md) 参照）。
 4. **新アカウントの workspace 招待は人手** — ツールは member 確認のみ。R4 の事前検証で fail-fast。自動招待 API を呼ばない。
 5. **PAT は短命運用** — README で「移行後 revoke」を推奨。長期保持はリスク。
 6. **2026-05-27 時点で developers.asana.com に 503 障害** — 一次情報の参照が一時不能（2026-05-28 復旧確認）。
 7. **非対話環境は想定外** — TTY 検出 / pipe 対応は実装不要。Asana CLI として人間が叩く前提。
 8. **`getTasks` の `assignee` パラメータは単一識別子** — comma-separated は非対応（search の `assignee.any` とは異なる）。本ツールは 1 ユーザー対象なので問題なし。
 9. **`opt_fields` の指定を忘れると assignee 情報が返らない** — 冪等性フィルタ (S-013) で `assignee.gid` を確認するため、`opt_fields:"name,gid,assignee.gid"` の指定は必須。
-10. **subtask は `getTasks` のレスポンスに親と区別なく含まれる** (H-DOM3 確認済) — `/tasks/{gid}/subtasks` の追加走査は不要。`migrator.ts` の `subtaskMode='expand'` フォールバックはコードに残してあるが起動しない。「subtask 対応が漏れているのでは?」と疑う必要なし。
+10. **subtask は `getTasks` のレスポンスに親と区別なく含まれる** (H-DOM3 確認済) — `/tasks/{gid}/subtasks` の追加走査は不要。`SubtaskMode` / `expandSubtasks` のフォールバックは削除済み (短命ツール・実機検証済みで YAGNI)。「subtask 対応が漏れているのでは?」と疑う必要なし。万一 Asana API の挙動が変わって subtask が getTasks から外れたら、`listSubtasks` ベースの BFS を再実装する。
 11. **`npm:asana` の transitive dep `debug` が import 時 `Object.keys(process.env)` を呼ぶ** — `--allow-env=<specific>` の narrow permission では SDK の import が失敗する。回避のため `src/main.ts` は SDK 系を `await import()` で lazy import し、help/version/引数検証は SDK ロード前に短絡する。permission を緩める前にこの分離を崩さないこと。
 
 ## 上位へ戻る条件

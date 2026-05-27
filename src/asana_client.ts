@@ -4,7 +4,6 @@
 //   - Centralize ApiClient construction (PAT injection via authentications['token']).
 //   - Normalize SDK errors to AsanaApiError (so migrator never sees superagent shapes).
 //   - Iterate Collection pagination so callers receive flat arrays.
-//   - Expose subtask fallback for when H-DOM3 turns out false.
 //
 // All API methods are wrapped by the caller in the rate-limiter, not here, so this
 // module stays free of timing concerns.
@@ -23,7 +22,6 @@ export interface AsanaClient {
     workspaceGid: string,
     fromUserGid: string,
   ): Promise<AsanaTask[]>;
-  listSubtasks(parentTaskGid: string): Promise<AsanaTask[]>;
   updateTaskAssignee(taskGid: string, toUserGid: string): Promise<void>;
 }
 
@@ -87,9 +85,7 @@ export function createAsanaClient(opts: CreateAsanaClientOpts): AsanaClient {
   auth.accessToken = opts.accessToken;
 
   if (opts.verbose) {
-    // Asana's SDK doesn't surface a hook; instrument the request defaults header.
-    // Real request/response dump requires patching superagent — defer to spike findings.
-    client.defaultHeaders["X-Verbose-Client"] = "asana-task-assign-migrator";
+    installVerboseHook(client);
   }
 
   const workspacesApi = new Asana.WorkspacesApi(client) as AnyApi;
@@ -167,36 +163,6 @@ export function createAsanaClient(opts: CreateAsanaClientOpts): AsanaClient {
       return out;
     },
 
-    async listSubtasks(parentTaskGid: string): Promise<AsanaTask[]> {
-      // H-DOM3 fallback: if getTasks doesn't include subtasks, walk per-parent here.
-      const out: AsanaTask[] = [];
-      try {
-        let page = await tasksApi.getSubtasksForTask(parentTaskGid, {
-          opt_fields: "name,gid,assignee.gid,completed",
-          limit: 100,
-        });
-        for (;;) {
-          const data = page.data ?? [];
-          for (const t of data) {
-            // Subtasks endpoint includes completed tasks — filter client-side.
-            if (t.completed) continue;
-            out.push({
-              gid: t.gid,
-              name: t.name,
-              assigneeGid: t.assignee?.gid ?? null,
-            });
-          }
-          if (typeof page.nextPage !== "function") break;
-          const next = await page.nextPage();
-          if (!next || next.data == null) break;
-          page = next;
-        }
-      } catch (err) {
-        throw normalizeError(err);
-      }
-      return out;
-    },
-
     async updateTaskAssignee(taskGid: string, toUserGid: string): Promise<void> {
       // S-012: body is exactly { data: { assignee: to_gid } }, nothing else.
       try {
@@ -215,4 +181,43 @@ export function createAsanaClient(opts: CreateAsanaClientOpts): AsanaClient {
 // deno-lint-ignore no-explicit-any
 function unwrap(res: any): any {
   return res?.data ?? res;
+}
+
+// Wraps ApiClient.callApi to dump request line and response status to stderr (S-015).
+// The SDK uses superagent internally and doesn't expose a request hook, so we monkey-patch
+// callApi — the single funnel point through which every API call flows.
+function installVerboseHook(client: AnyApi): void {
+  const original = client.callApi.bind(client) as (
+    ...args: unknown[]
+  ) => Promise<unknown>;
+  const encoder = new TextEncoder();
+  const write = (s: string) => {
+    try {
+      Deno.stderr.writeSync(encoder.encode(s));
+    } catch {
+      // stderr may not be writable in unusual host environments; swallow silently.
+    }
+  };
+  client.callApi = function (
+    path: string,
+    httpMethod: string,
+    pathParams: Record<string, unknown>,
+    ...rest: unknown[]
+  ): Promise<unknown> {
+    const url = client.buildUrl(path, pathParams);
+    write(`> ${httpMethod.toUpperCase()} ${url}\n`);
+    return original(path, httpMethod, pathParams, ...rest).then(
+      (res) => {
+        const status = (res as { response?: { status?: number } })?.response?.status;
+        write(`< ${status ?? "?"}\n`);
+        return res;
+      },
+      (err) => {
+        const e = err as { status?: number; response?: { status?: number } };
+        const status = e?.status ?? e?.response?.status ?? "ERR";
+        write(`< ${status}\n`);
+        throw err;
+      },
+    );
+  };
 }

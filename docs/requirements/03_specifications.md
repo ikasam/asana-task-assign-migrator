@@ -17,10 +17,10 @@
 | S-009 | 確認プロンプト: 本実行時のみ表示、Y/y または yes 入力で続行、他は中断 (exit 0)。`--yes` でスキップ | 確定 | R15 | — | プロンプトに従って分岐 | TTY 判定は実装しない（非対話環境は想定外） | — |
 | S-010 | API シーケンス: `getWorkspace` → `getUser(from)` → `getUser(to)` → `getUserForWorkspace(ws, to)` → `getTasks` (paginated) → `updateTask` × N | 確定 | R1, R4, R6 | H-API3, H-API4, H-API6 | 各 API 呼び出しが規定順序で発生 | — | — |
 | S-011 | `getTasks` 呼び出しパラメータ: `{workspace, assignee=from_user_gid, completed_since:"now", opt_fields:"name,gid,assignee.gid", limit:100}` + offset でページネーション。**subtask も親 task と区別なく同じレスポンスに含まれるため、`/tasks/{gid}/subtasks` の追加走査は不要** (H-DOM3 確認済) | 確定 | R1, R6 | H-API4, H-DOM3 | 全未完了タスクを取得 (subtask 含む) | — | — |
-| S-012 | `updateTask` 呼び出し本体: `{ data: { assignee: to_user_gid } }` | 確定 | R1, R3 | — | assignee のみが書き換わる | follower / collaborator など他フィールドへの代入は禁止 | — |
+| S-012 | `updateTask` 呼び出し本体: `{ data: { assignee: to_user_gid } }` | 確定 | R1, R3 | — | assignee のみが書き換わる | follower / collaborator など他フィールドへの代入は禁止 | — (補足は本ファイル下部の「S-012 補足」参照) |
 | S-013 | 冪等性フィルタ: `getTasks` の戻り値で `assignee.gid === to_user_gid` のタスクは update 対象から除外 | 確定 | R6 | H-API4 | 2 回目実行で対象が 0 件 | — | — |
 | S-014 | 確認プロンプトでの中断時挙動: exit 0、レポート出力なし | 確定 | R15 | — | プロンプトで `N` 入力時に exit 0 | — | — |
-| S-015 | `--verbose` 出力先: stderr に curl-likeなリクエスト/レスポンスダンプ。本体出力（stdout）は変えない | 仮置き | R14 | H-DENO2 | デバッグ可能なログ詳細度 | — | フォーマット詳細は実装時 |
+| S-015 | `--verbose` 出力先: stderr に `> METHOD URL` / `< STATUS` 形式の 1 リクエスト 2 行ダンプ。本体出力（stdout）は変えない | 確定 | R14 | — | デバッグ可能なログ詳細度 | — | — |
 | S-016 | `--quiet` 出力: per-task 行と確認プロンプト前後の進捗装飾を抑制。最終 summary と失敗一覧は出す | 確定 | R13 | — | quiet 時の出力サンプルと一致 | — | — |
 | S-017 | help / version: `-h`/`--help` で usage、`-V`/`--version` でセマンティックバージョン | 確定 | R2 | — | 標準フォーマット | — | バージョン番号体系は実装時 |
 | S-018 | エラーメッセージ仕様: `Error: <reason>` + 解決ガイド（PAT 未設定なら R12 ドラフト文言） | 確定 | R12 | — | サンプル文言と一致 | — | — |
@@ -193,6 +193,26 @@ Re-run the same command to retry failed tasks (idempotent).
   ]
 }
 ```
+
+## S-012 補足: live 検証結果と未検証論点
+
+2026-05-28 のライブ本実行で 37 件 100% 成功を観測し、`updateTask` の挙動について確定した部分と未検証の部分を分けて記録する。
+
+### 確定済み（live で観測）
+
+- 呼び出し: `tasksApi.updateTask({ data: { assignee: to_user_gid } }, task_gid, { opt_fields: "gid,assignee.gid" })` が 37 回 2xx を返した（[src/asana_client.ts:200-209](../../src/asana_client.ts) — `updateTaskAssignee`）。
+- 戻り値の `assignee.gid` が `to_user_gid` と一致するため、後続の冪等性フィルタ（S-013）が機能する。
+- subtask に対しても同じ body 形状で更新できる（subtask は `getTasks` のレスポンスに親 task と区別なく含まれるため、subtask 専用の更新パスは不要 — H-DOM3 採択）。
+
+### 未検証（運用上は不要だが、将来の知見として）
+
+| 論点 | 現状 | 検証する場合の方針 |
+|---|---|---|
+| `opt_fields` を省略した場合の挙動 | live では常に `opt_fields:"gid,assignee.gid"` を付与しており未検証。SDK の OpenAPI 自動生成型は `opt_fields` を optional にしているが、省略時に何が返るかは未確認 | spike スクリプトで `tasksApi.updateTask({data:{assignee:to_gid}}, gid)` を 1 回叩いて response body を確認 |
+| subtask 更新が parent.updated_at に影響するか | 本ツールでは subtask も普通に `updateTask` するが、parent への副作用（`updated_at` の伝播、通知の発火）は未観測 | parent と subtask の `updated_at` を更新前後で比較 |
+| `assignee: null` で解除できるか | 本ツールでは常に `to_user_gid` を渡すため不要。Asana API リファレンスでは `assignee` を `null` にできる旨が記載されているが、SDK 経由での挙動は未確認 | 検証用 task で `tasksApi.updateTask({data:{assignee:null}}, gid)` を叩いて response の `assignee` を確認 |
+
+これらは現状の運用要件（指定 from → to の付け替え）には不要で、検証コストを払う必要はない。Asana API の挙動が想定と異なる兆候（例えば subtask 更新で parent に望ましくない通知が飛ぶ等）が顕在化したら、上記のいずれかを spike で確認する。
 
 ## 終了コード（S-006）
 
