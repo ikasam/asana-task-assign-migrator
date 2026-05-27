@@ -176,7 +176,11 @@
 - **何をテストし、何をテストしないか**:
   - **unit テスト対象**: `output.ts`（フォーマッタ）、`rate_limiter.ts`（タイマー・再試行ロジック）、`cli.ts`（引数パーサ）など外部 I/O を持たない pure ロジック。
   - **テスト対象外**: `asana_client.ts`（SDK ファサード）、`migrator.ts`（pipeline）、`main.ts`（lazy import 経路）。SDK 挙動依存の層は live spike で代替。
-- **回帰検出**: `deno check` + `deno lint` + `deno fmt` を必須ゲートとし、SDK API シグネチャ変更は型エラーで検知。`npm:asana@3.x` の minor バージョンを `deno.lock` でピン留め。
+- **回帰検出の範囲と限界**:
+  - `deno check` + `deno lint` + `deno fmt` を必須ゲートとする。
+  - **検出できる**: `AsanaClient` interface とその実装、ファサード境界の app 側型 (`Workspace` / `User` / `AsanaTask`)、`migrator.ts` / `output.ts` 側のシグネチャ不整合。
+  - **検出できない**: SDK の API オブジェクト (`workspacesApi.getWorkspace` / `tasksApi.updateTask` 等) のメソッド名や引数構造の変更。判断 23 で SDK 型補完を諦め、`asana_client.ts` 内部で `AnyApi = any` キャストを許可しているため、SDK 側の breaking change は型エラーとして表面化しない。
+  - **代替の検出手段**: `npm:asana@3.x` の minor バージョンを `deno.lock` でピン留めし、SDK 更新時は手動で spike (`spike/phase1_load.ts`, `phase2_api.ts`) を再実行する運用とする。
 - **関連**: [02_hypotheses.md](02_hypotheses.md)（live で採択した H-API4/5/6, H-DOM3, H-DENO2/3）、判断 7（SDK 採用）、判断 9（スパイク優先）
 
 ---

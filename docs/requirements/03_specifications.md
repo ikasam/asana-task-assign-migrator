@@ -200,7 +200,7 @@ Re-run the same command to retry failed tasks (idempotent).
 
 ### 確定済み（live で観測）
 
-- 呼び出し: `tasksApi.updateTask({ data: { assignee: to_user_gid } }, task_gid, { opt_fields: "gid,assignee.gid" })` が 37 回 2xx を返した（[src/asana_client.ts:200-209](../../src/asana_client.ts) — `updateTaskAssignee`）。
+- 呼び出し: `tasksApi.updateTask({ data: { assignee: to_user_gid } }, task_gid, { opt_fields: "gid,assignee.gid" })` が 37 回 2xx を返した（[src/asana_client.ts](../../src/asana_client.ts) の `updateTaskAssignee` 関数）。
 - 戻り値の `assignee.gid` が `to_user_gid` と一致するため、後続の冪等性フィルタ（S-013）が機能する。
 - subtask に対しても同じ body 形状で更新できる（subtask は `getTasks` のレスポンスに親 task と区別なく含まれるため、subtask 専用の更新パスは不要 — H-DOM3 採択）。
 
