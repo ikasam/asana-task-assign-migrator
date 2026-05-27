@@ -55,14 +55,16 @@
 
 ## 要検証事項
 
-| ID | 内容 | 検証タイミング |
+2026-05-28 Phase 2 スパイク (`spike/phase2_api.ts`) で実機検証を実施し、配布関連 (H-DENO3) を除いて全て採択済み。
+
+| ID | 内容 | 状態 |
 |---|---|---|
-| H-API4 | `getTasks({workspace, assignee, completed_since:"now"})` が期待通り未完了タスクをフィルタする | 実装フェーズ初期 |
-| H-API5 | `getTasks` が Free プランでも動く | 実装フェーズ初期 |
-| H-API6 | `getUserForWorkspace` が非メンバーで 404 を返す | 実装フェーズ初期 |
-| H-DENO2 | superagent 経由で 429 Retry-After ヘッダーが読める | レート制限実装時 |
+| H-API4 | `getTasks({workspace, assignee, completed_since:"now"})` が期待通り未完了タスクをフィルタする | ✓ 採択 (2026-05-28) |
+| H-API5 | `getTasks` が Free プランでも動く | ✓ 採択 (2026-05-28) |
+| H-API6 | `getUserForWorkspace` が非メンバーで 404 を返す | ✓ 採択 (2026-05-28、検証 workspace の非メンバー email で 404 観測) |
+| H-DENO2 | superagent 経由で `err.response.headers` が読める (Retry-After 含む) | ✓ 採択 (2026-05-28、404 ケースで header object 観測。429 実観測時に最終確認) |
+| H-DOM3 | subtask が `getTasks` のレスポンスに含まれる | ✓ 採択 (2026-05-28、検証用 parent task の subtask 2 件が当該 assignee の `getTasks` 結果に含まれ overlap=2/2) → `subtaskMode='auto'` で安全。`'expand'` は fallback コードのみ |
 | H-DENO3 | `deno compile` で `npm:asana` を含む単一バイナリが生成・実行できる | 配布形態決定時 |
-| H-DOM3 | subtask が `getTasks` のレスポンスに含まれる、または別途取得が必要 | 実装フェーズ初期 |
 
 ## 強い制約
 
@@ -117,14 +119,13 @@
 
 ## 上位へ戻る条件
 
+H-API4/5/6 / H-DOM3 / H-DENO2 は 2026-05-28 に採択済み。残りの戻り条件は以下:
+
 | 条件 | 戻る先 |
 |---|---|
-| H-API4 が偽（`getTasks` で期待通りフィルタできない） | 判断 15 を再開、検索戦略の再設計 |
-| H-API5 が偽（Free プランで動かない） | 判断 8 を再開、Premium 要件を明文化 |
-| H-API6 が偽（非メンバー判定が `getUserForWorkspace` で取れない） | R4 の実装方式変更（`getUsersForWorkspace` の list で判定など） |
-| H-DENO2 が偽（429 ヘッダー取得不可） | 判断 7 を再開、独自 fetch クライアントへ切替 |
 | H-DENO3 が偽（`deno compile` で動かない） | 配布形態の再検討（`deno install` or `deno task` 経由） |
-| `npm:asana@3` の挙動が想定と大きく異なる | 判断 7 を再開、独自 fetch クライアントへ切替 |
+| 運用時に実 429 を観測し Retry-After が拾えないと判明 | 判断 7 を再開、独自 fetch クライアントへ切替 |
+| `npm:asana@3` の挙動が想定と大きく異なる（他 API 呼び出しで判明） | 判断 7 を再開、独自 fetch クライアントへ切替 |
 | 想定ユースケースが「複数ユーザー一括」に変わる | R2（判断 2）から見直し |
 | Asana 側の制約が解消される | ツール廃止を検討 |
 

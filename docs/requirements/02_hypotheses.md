@@ -8,16 +8,16 @@
 | H-BEH1 | 行動 | 実行者は IT 管理者または当該ユーザー本人で、PAT を発行できる権限を持つ | Asana の PAT は本人 / 管理者が発行可 | 採択 | 判断 13 で PAT を採用 | — | 利用組織で PAT 発行権限が無いと判明 | ikasam |
 | H-DOM1 | ドメイン | Asana の `assignee` フィールドは単一ユーザー（複数 assign なし） | Asana 公式 API 仕様 | 確定 | API 型定義 / 公式 doc | — | — | Asana 公式 |
 | H-DOM2 | ドメイン | 「新規作成アカウント」は対象 workspace の member になっているが、まだほぼ何も assign されていない状態 | 判断 4 の補足説明 | 採択 | 利用者からのヒアリング | — | 新アカウントが既に member 未登録のまま実行される | ikasam |
-| H-DOM3 | ドメイン | Asana の subtask も `assignee` フィールドを持ち、親タスクとは独立して扱われる | Asana 公式 API 仕様 | 仮置き | 実機検証 | — | subtask に対する `updateTask` が想定外の挙動 | 実装フェーズで確認 |
+| H-DOM3 | ドメイン | Asana の subtask も `assignee` フィールドを持ち、`getTasks({workspace, assignee})` で親タスクと区別なく返る | Asana 公式 API 仕様 + 実機検証 | 採択 | 2026-05-28 Phase 2 スパイクで実機検証済: 別ユーザーに assign された未完了 subtask 2 件が、当該 assignee の `getTasks` 結果に両方含まれた (overlap=2/2) | — | — | — |
 | H-INT1 | 相互作用 | dry-run → 確認 → 本実行 のフローが利用者にとって自然 | 破壊的操作の標準 UX | 仮置き | 実利用フィードバック | プロンプト承認率が高い | 利用者が常に `--yes` を使う / dry-run をスキップする | ikasam |
 | H-API1 | 実装 | `/workspaces/{ws}/tasks/search` で assignee + completed フィルタが使える | Asana 公式 doc | 採択（ただし不採用に切替） | 型定義確認 | フィルタ可能 | — | — |
 | H-API2 | 実装 | 上記 search API は Premium 以上のプラン限定 | Asana 公式 doc | 採択 | SDK 内 JSDoc + 公式 doc | プラン制限あり | — | Asana 公式 |
 | H-API3 | 実装 | `usersApi.getUser(email)` で email を直接識別子として渡せる | SDK 型定義 | 採択 | UsersApi.d.ts 確認 | "me" / email / gid のいずれも受付 | — | — |
-| H-API4 | 実装 | `tasksApi.getTasks({workspace, assignee, completed_since:"now"})` で strongly consistent に未完了タスクを取得できる | SDK 型定義 + Asana JSDoc 注記 | 採択 | TasksApi.d.ts 確認 | パラメータの組み合わせが API シグネチャに存在 | 実機で空配列しか返らない、または filter 効かない | 実装フェーズで確認 |
-| H-API5 | 実装 | `getTasks` は Free プランでも動く（Premium 限定ではない） | 一般的な Asana API の慣行（search は明示的に Premium 限定とドキュメント化されている一方、getTasks は無記載） | 要検証 | 実機テストで 402 が返らないこと | Free プランで実行成功 | 402 / 権限エラーが返る | 実装フェーズで確認 |
-| H-API6 | 実装 | `usersApi.getUserForWorkspace(workspace, user)` が非メンバーで 404 を返す | 一般的な Asana API の慣行 | 要検証 | 実機テストで 404 を確認 | 非メンバーで明確なエラー | 200 が返って member 判定できない | 実装フェーズで確認 |
+| H-API4 | 実装 | `tasksApi.getTasks({workspace, assignee, completed_since:"now"})` で strongly consistent に未完了タスクを取得できる | SDK 型定義 + Asana JSDoc 注記 + 実機検証 | 採択 | 2026-05-28 Phase 2 スパイクで確認: 全 sample item で `completed=false` かつ `assignee.gid` が populated | パラメータの組み合わせが API シグネチャに存在 | — | — |
+| H-API5 | 実装 | `getTasks` は Free プランでも動く（Premium 限定ではない） | 一般的な Asana API の慣行（search は明示的に Premium 限定とドキュメント化されている一方、getTasks は無記載） + 実機検証 | 採択 | 2026-05-28 Phase 2 スパイクで実機検証済: 検証 workspace で 402 を返さず、結果が正常返却 | Free プランで実行成功 | — | — |
+| H-API6 | 実装 | `usersApi.getUserForWorkspace(workspace, user)` が非メンバーで 404 を返す | 一般的な Asana API の慣行 + 実機検証 | 採択 | 2026-05-28 Phase 2 スパイクで実機検証済: 検証 workspace の非メンバー email に対し HTTP 404 を観測 | 非メンバーで明確なエラー | — | — |
 | H-DENO1 | 実装 | `npm:asana@3` が Deno 2.x でロード可能で、ApiClient / 各種 Api クラスが構築できる | Phase 1 スパイクで実測 | 採択 | spike/phase1_load.ts の出力 | import / constructor が成功 | — | — |
-| H-DENO2 | 実装 | superagent ベースのエラーオブジェクトから 429 / Retry-After ヘッダーを取得できる | 一般的な superagent の挙動 | 要検証 | 実機で 429 を観測したときに ResponseError から header が読めるか | err.response.headers['retry-after'] が取れる | SDK 内で 429 が完全に吸収されて見えない | 実装フェーズで確認 |
+| H-DENO2 | 実装 | superagent ベースのエラーオブジェクトから 429 / Retry-After ヘッダーを取得できる | 一般的な superagent の挙動 + 実機検証 | 採択 | 2026-05-28 Phase 2 スパイクで確認: 404 エラー発生時に `err.response.headers` が object として読み取れ、`content-type`, `content-length`, `connection`, `date`, `x-frame-options` 等のキーが含まれる (429 ケースでも同じ shape である見込み) | err.response.headers['retry-after'] が取れる | 実 429 を観測してから最終確認 (運用時) | — |
 | H-DENO3 | 実装 | `deno compile` で npm:asana を含む単一バイナリを生成できる | Deno 2.x の npm 互換 | 要検証 | 試行 | バイナリが生成・実行可能 | 生成失敗 / 実行時エラー | 配布形態決定時 |
 
 ## 仮説検証計画

@@ -24,7 +24,10 @@ console.log("[8] UsersApi instance:", usersApi.constructor.name);
 console.log("[9] usersApi.getUser is function:", typeof usersApi.getUser);
 
 const tasksApi = new Asana.TasksApi(client);
-console.log("[10] tasksApi.searchTasksForWorkspace is function:", typeof tasksApi.searchTasksForWorkspace);
+console.log(
+  "[10] tasksApi.searchTasksForWorkspace is function:",
+  typeof tasksApi.searchTasksForWorkspace,
+);
 console.log("[11] tasksApi.updateTask is function:", typeof tasksApi.updateTask);
 
 const workspacesApi = new Asana.WorkspacesApi(client);
