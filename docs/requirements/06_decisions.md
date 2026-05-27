@@ -156,6 +156,14 @@
 - **理由**: 別セッションでクリーンに実装フェーズへ移行する。
 - **付帯指示**: requirements-hypothesis-dialogue の各種アウトプットを成果として作成する（このディレクトリ）。
 
+## 判断 23: SDK 型補完を諦め、ファサード層でアプリ側型を再定義する
+
+- **選択肢**: A SDK の型をそのまま app に流す / B ファサード層で `Workspace` / `User` / `AsanaTask` 等の app 側型を再定義 / C TypeScript 型を諦め JSDoc + runtime 検証のみ
+- **採択**: **B**
+- **理由**: `asana@3.1.11` の型定義は OpenAPI 自動生成で、戻り値は `Promise<any>` や `Promise<Collection | any>` 程度しか提供されない（`data: any[]` 経由で実データに辿り着く）。当初 `project_tech_stack.md` で期待していた「SDK で型補完を得つつ」という動機は SDK 側だけでは達成不能。`asana_client.ts` のファサードで app 側型を `types.ts` に正規化することで、migrator / output / tests は SDK の `any` を一切触らずに済むよう設計した。
+- **副作用**: ファサード層自体は `any` を内包する。`// deno-lint-ignore no-explicit-any` を局所的に許可している。
+- **関連**: H-DENO1, `src/asana_client.ts`, `src/types.ts`, [project_tech_stack の懸念点 C4「OpenAPI 自動生成の冗長 API — 内部にファサードを置けば呼び出し側は綺麗」]
+
 ---
 
 ## 棄却された案の整理（再検討トリガー付き）

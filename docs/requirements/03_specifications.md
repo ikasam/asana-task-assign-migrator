@@ -16,7 +16,7 @@
 | S-008 | エラーストリーム規約: 進捗は stdout / エラーは stderr / `--json` は全 stdout で内部に errors キー | 確定 | R7, R13, R14 | — | リダイレクトで分離可能 | — | — |
 | S-009 | 確認プロンプト: 本実行時のみ表示、Y/y または yes 入力で続行、他は中断 (exit 0)。`--yes` でスキップ | 確定 | R15 | — | プロンプトに従って分岐 | TTY 判定は実装しない（非対話環境は想定外） | — |
 | S-010 | API シーケンス: `getWorkspace` → `getUser(from)` → `getUser(to)` → `getUserForWorkspace(ws, to)` → `getTasks` (paginated) → `updateTask` × N | 確定 | R1, R4, R6 | H-API3, H-API4, H-API6 | 各 API 呼び出しが規定順序で発生 | — | — |
-| S-011 | `getTasks` 呼び出しパラメータ: `{workspace, assignee=from_user_gid, completed_since:"now", opt_fields:"name,gid,assignee.gid", limit:100}` + offset でページネーション | 確定 | R1, R6 | H-API4 | 全未完了タスクを取得 | — | — |
+| S-011 | `getTasks` 呼び出しパラメータ: `{workspace, assignee=from_user_gid, completed_since:"now", opt_fields:"name,gid,assignee.gid", limit:100}` + offset でページネーション。**subtask も親 task と区別なく同じレスポンスに含まれるため、`/tasks/{gid}/subtasks` の追加走査は不要** (H-DOM3 確認済) | 確定 | R1, R6 | H-API4, H-DOM3 | 全未完了タスクを取得 (subtask 含む) | — | — |
 | S-012 | `updateTask` 呼び出し本体: `{ data: { assignee: to_user_gid } }` | 確定 | R1, R3 | — | assignee のみが書き換わる | follower / collaborator など他フィールドへの代入は禁止 | — |
 | S-013 | 冪等性フィルタ: `getTasks` の戻り値で `assignee.gid === to_user_gid` のタスクは update 対象から除外 | 確定 | R6 | H-API4 | 2 回目実行で対象が 0 件 | — | — |
 | S-014 | 確認プロンプトでの中断時挙動: exit 0、レポート出力なし | 確定 | R15 | — | プロンプトで `N` 入力時に exit 0 | — | — |

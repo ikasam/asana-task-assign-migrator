@@ -16,9 +16,9 @@
 | H-API4 | 実装 | `tasksApi.getTasks({workspace, assignee, completed_since:"now"})` で strongly consistent に未完了タスクを取得できる | SDK 型定義 + Asana JSDoc 注記 + 実機検証 | 採択 | 2026-05-28 Phase 2 スパイクで確認: 全 sample item で `completed=false` かつ `assignee.gid` が populated | パラメータの組み合わせが API シグネチャに存在 | — | — |
 | H-API5 | 実装 | `getTasks` は Free プランでも動く（Premium 限定ではない） | 一般的な Asana API の慣行（search は明示的に Premium 限定とドキュメント化されている一方、getTasks は無記載） + 実機検証 | 採択 | 2026-05-28 Phase 2 スパイクで実機検証済: 検証 workspace で 402 を返さず、結果が正常返却 | Free プランで実行成功 | — | — |
 | H-API6 | 実装 | `usersApi.getUserForWorkspace(workspace, user)` が非メンバーで 404 を返す | 一般的な Asana API の慣行 + 実機検証 | 採択 | 2026-05-28 Phase 2 スパイクで実機検証済: 検証 workspace の非メンバー email に対し HTTP 404 を観測 | 非メンバーで明確なエラー | — | — |
-| H-DENO1 | 実装 | `npm:asana@3` が Deno 2.x でロード可能で、ApiClient / 各種 Api クラスが構築できる | Phase 1 スパイクで実測 | 採択 | spike/phase1_load.ts の出力 | import / constructor が成功 | — | — |
+| H-DENO1 | 実装 | `npm:asana@3` が Deno 2.x でロード可能で、ApiClient / 各種 Api クラスが構築できる | Phase 1 スパイクで実測 + 実装フェーズ検証 | 採択（補足あり） | spike/phase1_load.ts の出力 + 実装中に判明: transitive dep `debug@4.4.3` が import 時に `Object.keys(process.env)` を呼ぶため、`--allow-env=<specific>` の narrow permission では SDK の import 自体が失敗する。回避策として SDK 系を `await import()` で lazy 化し、CLI 引数検証 / help / version path を SDK ロード前に短絡する設計を採用 (`src/main.ts`) | import / constructor が成功 + narrow env permission が維持可能 | — | — |
 | H-DENO2 | 実装 | superagent ベースのエラーオブジェクトから 429 / Retry-After ヘッダーを取得できる | 一般的な superagent の挙動 + 実機検証 | 採択 | 2026-05-28 Phase 2 スパイクで確認: 404 エラー発生時に `err.response.headers` が object として読み取れ、`content-type`, `content-length`, `connection`, `date`, `x-frame-options` 等のキーが含まれる (429 ケースでも同じ shape である見込み) | err.response.headers['retry-after'] が取れる | 実 429 を観測してから最終確認 (運用時) | — |
-| H-DENO3 | 実装 | `deno compile` で npm:asana を含む単一バイナリを生成できる | Deno 2.x の npm 互換 | 要検証 | 試行 | バイナリが生成・実行可能 | 生成失敗 / 実行時エラー | 配布形態決定時 |
+| H-DENO3 | 実装 | `deno compile` で npm:asana を含む単一バイナリを生成できる | Deno 2.x の npm 互換 + 実機検証 | 採択 | 2026-05-28 実機検証: `deno compile --allow-net=app.asana.com --allow-env --allow-read --output dist/asana-task-assign-migrator src/main.ts` で 92 MB の単一バイナリを生成。--help / --version / 引数バリデーション / PAT 未設定 / 実 API pre-check (workspace + getUser) まで全て動作 | バイナリが生成・実行可能 | — | — |
 
 ## 仮説検証計画
 

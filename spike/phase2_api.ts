@@ -212,8 +212,8 @@ async function main() {
 //      and check whether the subtask gid appears.
 //   3. Report ✓ if any subtask appears in the corresponding assignee's getTasks list,
 //      ✗ if no overlap exists despite having candidates, else inconclusive.
-// deno-lint-ignore no-explicit-any
 async function probeSubtasks(
+  // deno-lint-ignore no-explicit-any
   tasksApi: any,
   parentGid: string,
   parentItems: Array<Record<string, unknown>>,

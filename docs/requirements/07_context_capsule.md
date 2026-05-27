@@ -55,7 +55,7 @@
 
 ## 要検証事項
 
-2026-05-28 Phase 2 スパイク (`spike/phase2_api.ts`) で実機検証を実施し、配布関連 (H-DENO3) を除いて全て採択済み。
+2026-05-28 Phase 2 スパイク (`spike/phase2_api.ts`) と `deno compile` の実機検証で、要検証だった仮説は全て採択済み。
 
 | ID | 内容 | 状態 |
 |---|---|---|
@@ -64,7 +64,7 @@
 | H-API6 | `getUserForWorkspace` が非メンバーで 404 を返す | ✓ 採択 (2026-05-28、検証 workspace の非メンバー email で 404 観測) |
 | H-DENO2 | superagent 経由で `err.response.headers` が読める (Retry-After 含む) | ✓ 採択 (2026-05-28、404 ケースで header object 観測。429 実観測時に最終確認) |
 | H-DOM3 | subtask が `getTasks` のレスポンスに含まれる | ✓ 採択 (2026-05-28、検証用 parent task の subtask 2 件が当該 assignee の `getTasks` 結果に含まれ overlap=2/2) → `subtaskMode='auto'` で安全。`'expand'` は fallback コードのみ |
-| H-DENO3 | `deno compile` で `npm:asana` を含む単一バイナリが生成・実行できる | 配布形態決定時 |
+| H-DENO3 | `deno compile` で `npm:asana` を含む単一バイナリが生成・実行できる | ✓ 採択 (2026-05-28、92 MB バイナリ生成、実 API pre-check まで動作) |
 
 ## 強い制約
 
@@ -112,18 +112,19 @@
 3. **`assignee` の更新は単一フィールド更新** — `updateTask({data:{assignee:to_gid}}, task_gid)`。`name` や他フィールドを誤って渡さない。
 4. **新アカウントの workspace 招待は人手** — ツールは member 確認のみ。R4 の事前検証で fail-fast。自動招待 API を呼ばない。
 5. **PAT は短命運用** — README で「移行後 revoke」を推奨。長期保持はリスク。
-6. **2026-05-27 時点で developers.asana.com に 503 障害** — 一次情報の参照が一時不能。障害復旧後に H-API5 / H-API6 / R11 ドラフトを一次情報で再確認。
+6. **2026-05-27 時点で developers.asana.com に 503 障害** — 一次情報の参照が一時不能（2026-05-28 復旧確認）。
 7. **非対話環境は想定外** — TTY 検出 / pipe 対応は実装不要。Asana CLI として人間が叩く前提。
 8. **`getTasks` の `assignee` パラメータは単一識別子** — comma-separated は非対応（search の `assignee.any` とは異なる）。本ツールは 1 ユーザー対象なので問題なし。
 9. **`opt_fields` の指定を忘れると assignee 情報が返らない** — 冪等性フィルタ (S-013) で `assignee.gid` を確認するため、`opt_fields:"name,gid,assignee.gid"` の指定は必須。
+10. **subtask は `getTasks` のレスポンスに親と区別なく含まれる** (H-DOM3 確認済) — `/tasks/{gid}/subtasks` の追加走査は不要。`migrator.ts` の `subtaskMode='expand'` フォールバックはコードに残してあるが起動しない。「subtask 対応が漏れているのでは?」と疑う必要なし。
+11. **`npm:asana` の transitive dep `debug` が import 時 `Object.keys(process.env)` を呼ぶ** — `--allow-env=<specific>` の narrow permission では SDK の import が失敗する。回避のため `src/main.ts` は SDK 系を `await import()` で lazy import し、help/version/引数検証は SDK ロード前に短絡する。permission を緩める前にこの分離を崩さないこと。
 
 ## 上位へ戻る条件
 
-H-API4/5/6 / H-DOM3 / H-DENO2 は 2026-05-28 に採択済み。残りの戻り条件は以下:
+要検証だった仮説は全て 2026-05-28 までに採択済み。残りの戻り条件は以下:
 
 | 条件 | 戻る先 |
 |---|---|
-| H-DENO3 が偽（`deno compile` で動かない） | 配布形態の再検討（`deno install` or `deno task` 経由） |
 | 運用時に実 429 を観測し Retry-After が拾えないと判明 | 判断 7 を再開、独自 fetch クライアントへ切替 |
 | `npm:asana@3` の挙動が想定と大きく異なる（他 API 呼び出しで判明） | 判断 7 を再開、独自 fetch クライアントへ切替 |
 | 想定ユースケースが「複数ユーザー一括」に変わる | R2（判断 2）から見直し |
