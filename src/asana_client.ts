@@ -186,6 +186,13 @@ function unwrap(res: any): any {
 // Wraps ApiClient.callApi to dump request line and response status to stderr (S-015).
 // The SDK uses superagent internally and doesn't expose a request hook, so we monkey-patch
 // callApi — the single funnel point through which every API call flows.
+//
+// callApi signature (Asana SDK 3.1.11 ApiClient.js#callApi):
+//   callApi(path, httpMethod, pathParams, queryParams, headerParams,
+//           formParams, bodyParam, authNames, contentTypes, accepts, returnType)
+// Resolves to `{ data, response }` where `response` is superagent's Response object —
+// `response.status` is the HTTP status code. (API methods like `getWorkspace` unwrap
+// `.data` downstream; we hook callApi directly so we still see the raw shape.)
 function installVerboseHook(client: AnyApi): void {
   const original = client.callApi.bind(client) as (
     ...args: unknown[]
@@ -202,11 +209,14 @@ function installVerboseHook(client: AnyApi): void {
     path: string,
     httpMethod: string,
     pathParams: Record<string, unknown>,
+    queryParams: Record<string, unknown>,
     ...rest: unknown[]
   ): Promise<unknown> {
     const url = client.buildUrl(path, pathParams);
-    write(`> ${httpMethod.toUpperCase()} ${url}\n`);
-    return original(path, httpMethod, pathParams, ...rest).then(
+    const qs = serializeQuery(queryParams);
+    const fullUrl = qs ? `${url}?${qs}` : url;
+    write(`> ${httpMethod.toUpperCase()} ${fullUrl}\n`);
+    return original(path, httpMethod, pathParams, queryParams, ...rest).then(
       (res) => {
         const status = (res as { response?: { status?: number } })?.response?.status;
         write(`< ${status ?? "?"}\n`);
@@ -220,4 +230,18 @@ function installVerboseHook(client: AnyApi): void {
       },
     );
   };
+}
+
+// Serializes the SDK's queryParams object the same way superagent.query() would.
+// We don't reuse client.normalizeParams() because we want a flat URLSearchParams output
+// (arrays are joined with comma — sufficient for Asana's opt_fields / limit / etc.).
+function serializeQuery(params: Record<string, unknown> | undefined): string {
+  if (!params) return "";
+  const usp = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v == null) continue;
+    if (Array.isArray(v)) usp.append(k, v.map(String).join(","));
+    else usp.append(k, String(v));
+  }
+  return usp.toString();
 }
