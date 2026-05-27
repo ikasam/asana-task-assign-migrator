@@ -180,7 +180,7 @@
   - `deno check` + `deno lint` + `deno fmt` を必須ゲートとする。
   - **検出できる**: `AsanaClient` interface とその実装、ファサード境界の app 側型 (`Workspace` / `User` / `AsanaTask`)、`migrator.ts` / `output.ts` 側のシグネチャ不整合。
   - **検出できない**: SDK の API オブジェクト (`workspacesApi.getWorkspace` / `tasksApi.updateTask` 等) のメソッド名や引数構造の変更。判断 23 で SDK 型補完を諦め、`asana_client.ts` 内部で `AnyApi = any` キャストを許可しているため、SDK 側の breaking change は型エラーとして表面化しない。
-  - **代替の検出手段**: `npm:asana@3.x` の minor バージョンを `deno.lock` でピン留めし、SDK 更新時は手動で spike (`spike/phase1_load.ts`, `phase2_api.ts`) を再実行する運用とする。
+  - **代替の検出手段**: `deno.json` の `imports` で SDK の exact バージョンをピン留め (現在 `npm:asana@3.1.11`、`deno.lock` で transitive 依存も固定)、SDK 更新時は明示的に同 import を bump したうえで spike (`spike/phase1_load.ts`, `phase2_api.ts`) を手動再実行する運用とする。
 - **関連**: [02_hypotheses.md](02_hypotheses.md)（live で採択した H-API4/5/6, H-DOM3, H-DENO2/3）、判断 7（SDK 採用）、判断 9（スパイク優先）
 
 ---
