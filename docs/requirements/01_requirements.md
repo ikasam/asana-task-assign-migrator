@@ -75,7 +75,7 @@
 | R22 | survey 出力は人間可読（既定）+ `--json`、`--verbose` で API debug を stderr、`--quiet` で内訳を省略しサマリのみ | システム x 機能 | 確定 | D-014, D-017 / 判断 28 | — | — |
 | R23 | per-account のタスク取得エラーは記録して継続し、末尾に列挙する（migrate の R7 を踏襲） | システム x 機能 | 確定 | D-017 | — | — |
 | R24 | `--workspace` の値が GID（数値）でないときはドメイン名とみなし、`GET /workspaces`（`opt_fields=gid,name,is_organization,email_domains`）の `email_domains` 照合で GID に解決する。数値なら従来どおり GID 直指定。migrate / survey の両方に適用 | システム x 機能 | 確定 | D-018 / 判断 29, 30 | H-API8 | email_domains の PAT 可視性（H-API8） |
-| R25 | ドメイン解決が 0 件 / 複数件のときは fail-fast（exit 2）し、PAT に可視な workspace（GID・name・email_domains）を列挙して案内する | システム x 機能 | 確定 | D-018 / 判断 30 | H-API8 | — |
+| R25 | ドメイン解決が 0 件 / 複数件のときは fail-fast（exit 2）し、PAT に可視な workspace（GID・name・email_domains）を列挙して案内する | システム x 機能 | 確定 | D-018 / 判断 30 | H-API8 | 0 件 / 複数件のエラーパスは live 未実行（happy path のみ実機検証。`resolveWorkspace` に unit test 無し＝判断 24）。複数件は実環境で未到達（H-API8 見直し条件参照） |
 
 ## 種別の凡例
 
