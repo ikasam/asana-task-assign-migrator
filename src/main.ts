@@ -31,15 +31,13 @@ export async function main(argv: readonly string[]): Promise<ExitCode> {
   }
 
   if (parsed.kind === "help") {
-    stdWriter.out(helpText());
+    stdWriter.out(helpText(parsed.topic));
     return 0;
   }
   if (parsed.kind === "version") {
     stdWriter.out(versionText());
     return 0;
   }
-
-  const args = parsed.args;
 
   const token = Deno.env.get(PAT_ENV);
   if (!token) {
@@ -50,13 +48,18 @@ export async function main(argv: readonly string[]): Promise<ExitCode> {
   // Lazy-import the SDK boundary so help/version don't pay the cost of loading
   // npm:asana (which transitively reads process.env at import time).
   const { createAsanaClient } = await import("./asana_client.ts");
-  const { PreCheckError, runMigration } = await import("./migrator.ts");
-
-  const client = createAsanaClient({ accessToken: token, verbose: args.verbose });
-  const renderer = createRenderer(args);
+  const { PreCheckError } = await import("./migrator.ts");
+  const client = createAsanaClient({ accessToken: token, verbose: parsed.args.verbose });
 
   try {
-    return await runMigration({ args, client, renderer });
+    if (parsed.kind === "migrate") {
+      const { runMigration } = await import("./migrator.ts");
+      const renderer = createRenderer(parsed.args);
+      return await runMigration({ args: parsed.args, client, renderer });
+    }
+    // survey (read-only)
+    const { runSurvey } = await import("./survey.ts");
+    return await runSurvey({ args: parsed.args, client });
   } catch (e) {
     if (e instanceof PreCheckError) {
       formatFatal({ message: e.message, hint: e.hint });

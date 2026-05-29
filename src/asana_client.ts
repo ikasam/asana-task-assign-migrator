@@ -17,6 +17,9 @@ type AnyApi = any;
 export interface AsanaClient {
   getWorkspace(gid: string): Promise<Workspace>;
   getUser(email: string): Promise<User>;
+  // Lists every user in the workspace (with email when visible). Used by the
+  // survey subcommand. Users whose email the PAT cannot see get email = "".
+  listWorkspaceUsers(workspaceGid: string): Promise<User[]>;
   isMemberOfWorkspace(workspaceGid: string, userIdentifier: string): Promise<boolean>;
   listAssignedIncompleteTasks(
     workspaceGid: string,
@@ -111,6 +114,36 @@ export function createAsanaClient(opts: CreateAsanaClientOpts): AsanaClient {
       } catch (err) {
         throw normalizeError(err);
       }
+    },
+
+    async listWorkspaceUsers(workspaceGid: string): Promise<User[]> {
+      // GET /users?workspace=&opt_fields=name,email,gid — paginated like getTasks.
+      // Email is only returned for users the PAT can see; absent → "" sentinel.
+      const out: User[] = [];
+      try {
+        let page = await usersApi.getUsers({
+          workspace: workspaceGid,
+          opt_fields: "name,email,gid",
+          limit: 100,
+        });
+        for (;;) {
+          const data = page.data ?? [];
+          for (const u of data) {
+            out.push({
+              gid: u.gid,
+              email: (u.email ?? "").toLowerCase(),
+              name: u.name ?? "",
+            });
+          }
+          if (typeof page.nextPage !== "function") break;
+          const next = await page.nextPage();
+          if (!next || next.data == null) break;
+          page = next;
+        }
+      } catch (err) {
+        throw normalizeError(err);
+      }
+      return out;
     },
 
     async isMemberOfWorkspace(workspaceGid: string, userIdentifier: string): Promise<boolean> {

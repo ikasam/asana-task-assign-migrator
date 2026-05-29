@@ -222,6 +222,85 @@ Re-run the same command to retry failed tasks (idempotent).
 | 1 | 一部または全件のタスク更新に失敗（実行は試みた） |
 | 2 | 実行前エラー（引数不正、ASANA_ACCESS_TOKEN 未設定、workspace / user not found、新アカウントが workspace の member でない、from == to） |
 
+## survey サブコマンド仕様（2026-05-29 追加）
+
+移行残量を調べる読み取り専用サブコマンド。要件 [R16〜R23](01_requirements.md) を満たす。
+
+| ID | 仕様 | 状態 | 関連要件 | 依存する仮説 | 採択基準 | 下位への制約 | 未決事項 |
+|---|---|---|---|---|---|---|---|
+| S-019 | CLI はサブコマンド制（`migrate` / `survey`）。サブコマンドは明示必須で、無指定/未知サブコマンドは exit 2。`-h`/`--help`・`-V`/`--version` は top-level。破壊的変更のため VERSION を 0.2.0 に上げる | 確定 | R16 | — | サブコマンド分岐が動く | bare 呼び出し（旧 migrate）は廃止 | per-subcommand help の粒度 |
+| S-020 | `survey` 引数: `--workspace <gid>`（必須・数値）/ `--domain <domain>`（必須）/ `--json` / `--verbose` / `--quiet`。domain 妥当性は「`@`・空白を含まず、少なくとも 1 つのドット区切りラベルを持つ」こと、lowercase 正規化、先頭 `@` は許容して除去 | 確定 | R16 | — | 不正値で exit 2 | migrate 専用フラグ（`--from`/`--to`/`--dry-run`/`--yes`）は survey では Unknown option | — |
+| S-021 | survey 実行フロー: pre-check（`getWorkspace`）→ 全ユーザー列挙 → domain フィルタ → 対象ごとに未完了タスク件数集計（per-account エラーは記録して継続）→ 件数降順でレンダリング | 確定 | R17, R18, R19, R23 | H-API7, H-API4 | 各ステップが順序通り実行 | — | — |
+| S-022 | survey API シーケンス: `getWorkspace` → `getUsers`（paginated）→ `getTasks({assignee, completed_since:"now"})` × 対象数。`updateTask` は呼ばない | 確定 | R18, R21 | H-API4, H-API7, H-DOM3 | 規定順序で API 発生、更新系を呼ばない | — | — |
+| S-023 | survey 出力: 人間可読では workspace / domain / 総ユーザー数 / 対象数 / email 非可視数の注記 / アカウント別（件数降順）/ サマリ。`--json` では構造化 JSON | 確定 | R19, R20, R22 | — | サンプル出力と一致 | `--quiet` は内訳を省きサマリのみ | — |
+| S-024 | survey 終了コード: 2=使用法/pre-check 失敗 / 1=完了したが per-account エラーあり / 0=正常完了 | 確定 | R23 | — | 各ケースで規定の exit code | — | — |
+| S-025 | facade 拡張: `listWorkspaceUsers(workspaceGid): Promise<User[]>`（`getUsers` + ページネーション）。email 非可視ユーザーは `email:""` をセンチネルにし、survey 側で非可視と判定 | 確定 | R17, R20 | H-API7 | 全ユーザーを flat array で返す | — | — |
+| S-026 | survey は読み取り専用契約: `updateTaskAssignee` を含む更新系を一切呼ばない | 確定 | R21 | — | コード上 update 呼び出しが無い | — | — |
+
+### survey CLI シグネチャ（S-019 / S-020）
+
+```
+asana-task-assign-migrator <subcommand> [OPTIONS]
+
+SUBCOMMANDS:
+  migrate    旧→新アカウントの assignee 付け替え（既存）
+  survey     指定ドメインの未移行（未完了かつ当該ドメインが assignee）タスク件数を集計（読み取り専用）
+
+survey OPTIONS:
+  --workspace <gid>   対象 workspace の GID（必須）
+  --domain <domain>   集計対象ドメイン（必須、例 example.com）
+  --json              出力を JSON 形式に切替
+  --verbose           API リクエスト/レスポンス詳細を stderr に出力
+  --quiet             アカウント別内訳を省略しサマリのみ
+```
+
+### survey 出力サンプル（S-023）
+
+#### 人間可読
+
+```
+=== Unmigrated-task survey ===
+workspace : My Company (1234567890)
+domain    : @example.com
+
+workspace has 714 user(s); 43 match @example.com.
+  note: 97 user(s) returned no email (PAT lacks visibility) — they cannot be domain-classified.
+
+Incomplete tasks still assigned to @example.com accounts:
+
+     62  Alice Example <alice@example.com>
+     30  Bob Example <bob@example.com>
+     ...
+      0  Carol Example <carol@example.com>
+
+=== Summary ===
+domain accounts            : 43
+  of which with tasks      : 27
+unmigrated incomplete tasks : 301
+```
+
+#### JSON
+
+```json
+{
+  "mode": "survey",
+  "workspace": { "gid": "1234567890", "name": "My Company" },
+  "domain": "example.com",
+  "totalUsers": 714,
+  "emailInvisibleUsers": 97,
+  "matchedAccounts": 43,
+  "accountsWithTasks": 27,
+  "totalIncompleteTasks": 301,
+  "accounts": [
+    {
+      "gid": "111", "name": "Alice Example", "email": "alice@example.com", "count": 62,
+      "tasks": [ { "gid": "9876543210", "name": "Q2 planning document" } ]
+    }
+  ],
+  "erroredAccounts": 0
+}
+```
+
 ## 関連
 
 - [要件](01_requirements.md)

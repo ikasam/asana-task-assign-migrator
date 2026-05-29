@@ -1,6 +1,14 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
-import { confirm, createRenderer, type Writer } from "../src/output.ts";
-import type { AsanaTask, CliArgs, TaskResult, User, Workspace } from "../src/types.ts";
+import { confirm, createRenderer, renderSurvey, type Writer } from "../src/output.ts";
+import type {
+  AsanaTask,
+  CliArgs,
+  SurveyArgs,
+  SurveyPayload,
+  TaskResult,
+  User,
+  Workspace,
+} from "../src/types.ts";
 
 function captureWriter() {
   const out: string[] = [];
@@ -153,4 +161,91 @@ Deno.test("confirm: accepts y/yes (case-insensitive), rejects others", () => {
   assertEquals(confirm("?", () => "n\n", cap.w), false);
   assertEquals(confirm("?", () => "\n", cap.w), false);
   assertEquals(confirm("?", () => null, cap.w), false);
+});
+
+// ---- survey rendering ----
+
+const surveyArgs: SurveyArgs = {
+  workspace: "1",
+  domain: "example.com",
+  json: false,
+  verbose: false,
+  quiet: false,
+};
+
+const surveyPayload: SurveyPayload = {
+  mode: "survey",
+  workspace: { gid: "1234567890", name: "My Company" },
+  domain: "example.com",
+  totalUsers: 714,
+  emailInvisibleUsers: 97,
+  matchedAccounts: 2,
+  accountsWithTasks: 1,
+  totalIncompleteTasks: 5,
+  accounts: [
+    {
+      gid: "111",
+      name: "Alice",
+      email: "alice@example.com",
+      count: 5,
+      tasks: [{ gid: "t1", name: "Task 1", assigneeGid: "111" }],
+    },
+    { gid: "222", name: "Bob", email: "bob@example.com", count: 0, tasks: [] },
+  ],
+  erroredAccounts: 0,
+};
+
+Deno.test("renderSurvey (human): header, breakdown, invisible note, summary", () => {
+  const cap = captureWriter();
+  renderSurvey(surveyArgs, surveyPayload, cap.w);
+  const text = cap.out();
+  assertStringIncludes(text, "=== Unmigrated-task survey ===");
+  assertStringIncludes(text, "workspace : My Company (1234567890)");
+  assertStringIncludes(text, "domain    : @example.com");
+  assertStringIncludes(text, "714 user(s); 2 match @example.com");
+  assertStringIncludes(text, "97 user(s) returned no email");
+  assertStringIncludes(text, "5  Alice <alice@example.com>");
+  assertStringIncludes(text, "unmigrated incomplete tasks : 5");
+});
+
+Deno.test("renderSurvey (quiet): omits breakdown, keeps summary", () => {
+  const cap = captureWriter();
+  renderSurvey({ ...surveyArgs, quiet: true }, surveyPayload, cap.w);
+  const text = cap.out();
+  assert(!text.includes("Alice <alice@example.com>"));
+  assertStringIncludes(text, "=== Summary ===");
+  assertStringIncludes(text, "unmigrated incomplete tasks : 5");
+});
+
+Deno.test("renderSurvey (json): single JSON object on stdout", () => {
+  const cap = captureWriter();
+  renderSurvey({ ...surveyArgs, json: true }, surveyPayload, cap.w);
+  const parsed = JSON.parse(cap.out());
+  assertEquals(parsed.mode, "survey");
+  assertEquals(parsed.totalIncompleteTasks, 5);
+  assertEquals(parsed.emailInvisibleUsers, 97);
+  assertEquals(parsed.accounts.length, 2);
+});
+
+Deno.test("renderSurvey (human): per-account error surfaced", () => {
+  const cap = captureWriter();
+  const withErr: SurveyPayload = {
+    ...surveyPayload,
+    erroredAccounts: 1,
+    accountsWithTasks: 0,
+    accounts: [
+      {
+        gid: "333",
+        name: "Carol",
+        email: "carol@example.com",
+        count: 0,
+        tasks: [],
+        error: { httpStatus: 403, code: "not_authorized", message: "x" },
+      },
+    ],
+  };
+  renderSurvey(surveyArgs, withErr, cap.w);
+  const text = cap.out();
+  assertStringIncludes(text, "! Carol <carol@example.com>: ERROR HTTP 403 not_authorized");
+  assertStringIncludes(text, "accounts that errored");
 });

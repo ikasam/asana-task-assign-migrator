@@ -1,6 +1,6 @@
 # 06 — 判断履歴
 
-対話中に明示的に分岐させた判断（判断 1 〜 24）の記録。各判断について「選択肢 / 採択 / 理由」を残す。
+対話中に明示的に分岐させた判断（判断 1 〜 28）の記録。各判断について「選択肢 / 採択 / 理由」を残す。判断 25 以降は 2026-05-29 の survey サブコマンド追加フェーズ。
 
 ## 判断 1: 「すべての未完了タスク」の境界
 
@@ -176,12 +176,42 @@
 - **何をテストし、何をテストしないか**:
   - **unit テスト対象**: `output.ts`（フォーマッタ）、`rate_limiter.ts`（タイマー・再試行ロジック）、`cli.ts`（引数パーサ）など外部 I/O を持たない pure ロジック。
   - **テスト対象外**: `asana_client.ts`（SDK ファサード）、`migrator.ts`（pipeline）、`main.ts`（lazy import 経路）。SDK 挙動依存の層は live spike で代替。
+  - **survey 追加分（2026-05-29）**: `cli.ts` の `parseSurvey`（引数検証・ドメイン正規化）と `output.ts` の `renderSurvey`（整形）は pure ロジックとして unit テスト対象。`survey.ts`（orchestration）と `asana_client.ts` の `listWorkspaceUsers` は `migrator.ts` と同じ理由でテスト対象外とし、指定 workspace × ドメインに対する live 実行で検証する（2026-05-29: 既存のアドホック調査と件数一致を確認）。
 - **回帰検出の範囲と限界**:
   - `deno check` + `deno lint` + `deno fmt` を必須ゲートとする。
   - **検出できる**: `AsanaClient` interface とその実装、ファサード境界の app 側型 (`Workspace` / `User` / `AsanaTask`)、`migrator.ts` / `output.ts` 側のシグネチャ不整合。
   - **検出できない**: SDK の API オブジェクト (`workspacesApi.getWorkspace` / `tasksApi.updateTask` 等) のメソッド名や引数構造の変更。判断 23 で SDK 型補完を諦め、`asana_client.ts` 内部で `AnyApi = any` キャストを許可しているため、SDK 側の breaking change は型エラーとして表面化しない。
   - **代替の検出手段**: `deno.json` の `imports` で SDK の exact バージョンをピン留め (現在 `npm:asana@3.1.11`、`deno.lock` で transitive 依存も固定)、SDK 更新時は明示的に同 import を bump したうえで spike (`spike/phase1_load.ts`, `phase2_api.ts`) を手動再実行する運用とする。
 - **関連**: [02_hypotheses.md](02_hypotheses.md)（live で採択した H-API4/5/6, H-DOM3, H-DENO2/3）、判断 7（SDK 採用）、判断 9（スパイク優先）
+
+## 判断 25: 移行残量の調査機能を正式実装するか（2026-05-29）
+
+- **選択肢**: A 正式機能として実装 / B アドホック spike（移行残量調査）のまま運用 / C 実装しない
+- **採択**: **A**
+- **理由**: 移行の進捗・残量把握は移行ツールの自然な補助。読み取り専用で破壊リスクが無く、最小スコープ姿勢とも「読み取り専用・単一ドメイン」で整合する。アドホック spike の恒久化で再現性と保守性を得る。
+- **"未移行" の定義**: 「指定ドメインの email を持つアカウントが assignee の未完了タスク」をもって未移行と数える。移行先（新アカウント）のマッピングは不要（ドメイン単位の enumeration で十分）。
+- **関連**: W-008, D-013, R16〜R23, [設計選択 10](04_design_options.md)
+
+## 判断 26: survey の統合形態
+
+- **選択肢**: A サブコマンド化 / B 既存 CLI にフラグ追加 / C 独立エントリポイント
+- **採択**: **A**（さらに bare 呼び出しは廃止し、`migrate` / `survey` を明示必須）
+- **理由**: 独立機能の明確な境界。v0.1.0 未公開のため破壊コストが低く、対称な設計を優先。VERSION 0.2.0。
+- **関連**: R16, [設計選択 10](04_design_options.md), [S-019](03_specifications.md)
+
+## 判断 27: email 非可視ユーザーの扱い
+
+- **選択肢**: A 件数を明示して続行 / B 個別に email 再解決 / C 無視
+- **採択**: **A**
+- **理由**: レート制限を圧迫せず、数値が下限になりうる事実を注記で担保。実測で非可視はゲスト/制限メンバーが大半とみられ再解決コストに見合わない。
+- **関連**: R20, C-017, H-API7, [設計選択 11](04_design_options.md)
+
+## 判断 28: survey の出力形式
+
+- **選択肢**: A 人間可読 + `--json` / B 人間可読のみ / C JSON のみ
+- **採択**: **A**
+- **理由**: 既存 migrate（`--json` 対応）と一貫。手動確認と機械処理の両対応。`--quiet` で内訳省略、`--verbose` で API debug。
+- **関連**: R22, [S-023](03_specifications.md)
 
 ---
 
@@ -201,6 +231,10 @@
 | 進捗バー | 判断 19b | 失敗特定容易性を犠牲にしてでも視覚的進捗が必要との要望 |
 | TTY 検出 / 非対話対応 | 判断 19 補足 | CI / cron での自動実行ニーズが具体化 |
 | `--verbose` 非採用 | 判断 19d | （当初推奨は非採用だが、判断 19d で採用に上振れ） |
+| survey: 複数ドメイン同時集計 | 判断 25 | 複数ドメイン横断の移行残量把握ニーズが実証されたら |
+| survey: CSV / ファイル出力 | 判断 28 | stdout / `--json` リダイレクトでは不足との運用要望 |
+| survey: email 個別再解決 | 判断 27 | email 欠落が集計を無意味にするほど多いと判明 |
+| bare 呼び出し（サブコマンド省略）の維持 | 判断 26 | 既存利用者の移行コストが破壊コストを上回ると判明 |
 
 ## 関連
 

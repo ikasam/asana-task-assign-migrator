@@ -7,6 +7,8 @@ import type {
   CliArgs,
   MigrationSummary,
   OutputPayload,
+  SurveyArgs,
+  SurveyPayload,
   TaskResult,
   User,
   Workspace,
@@ -145,6 +147,60 @@ function jsonRenderer(w: Writer): Renderer {
       w.out(JSON.stringify(payload, null, 2) + "\n");
     },
   };
+}
+
+// Renders the survey result (S-023). Read-only: no progress / confirm states.
+// Human mode shows per-account counts; per-task detail lives only in --json.
+// --verbose affects the API request dump (asana_client), not this output.
+export function renderSurvey(
+  args: SurveyArgs,
+  payload: SurveyPayload,
+  w: Writer = stdWriter,
+): void {
+  if (args.json) {
+    w.out(JSON.stringify(payload, null, 2) + "\n");
+    return;
+  }
+
+  const lines: string[] = [];
+  lines.push("");
+  lines.push("=== Unmigrated-task survey ===");
+  lines.push(`workspace : ${payload.workspace.name} (${payload.workspace.gid})`);
+  lines.push(`domain    : @${payload.domain}`);
+  lines.push("");
+  lines.push(
+    `workspace has ${payload.totalUsers} user(s); ` +
+      `${payload.matchedAccounts} match @${payload.domain}.`,
+  );
+  if (payload.emailInvisibleUsers > 0) {
+    lines.push(
+      `  note: ${payload.emailInvisibleUsers} user(s) returned no email ` +
+        `(PAT lacks visibility) — they cannot be domain-classified.`,
+    );
+  }
+
+  if (!args.quiet && payload.matchedAccounts > 0) {
+    lines.push("");
+    lines.push(`Incomplete tasks still assigned to @${payload.domain} accounts:`);
+    lines.push("");
+    for (const a of payload.accounts) {
+      if (a.error) {
+        lines.push(`  ! ${a.name} <${a.email}>: ERROR HTTP ${a.error.httpStatus} ${a.error.code}`);
+        continue;
+      }
+      lines.push(`  ${String(a.count).padStart(5)}  ${a.name} <${a.email}>`);
+    }
+  }
+
+  lines.push("");
+  lines.push("=== Summary ===");
+  lines.push(`domain accounts             : ${payload.matchedAccounts}`);
+  lines.push(`  of which with tasks       : ${payload.accountsWithTasks}`);
+  lines.push(`unmigrated incomplete tasks : ${payload.totalIncompleteTasks}`);
+  if (payload.erroredAccounts > 0) {
+    lines.push(`accounts that errored       : ${payload.erroredAccounts}`);
+  }
+  w.out(lines.join("\n") + "\n");
 }
 
 // Confirmation prompt per S-009. Returns true to continue, false to abort.

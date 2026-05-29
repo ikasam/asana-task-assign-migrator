@@ -1,15 +1,16 @@
 {
   "name": "@ikasam/asana-task-assign-migrator",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "exports": "./src/main.ts",
   "tasks": {
-    "migrate": "deno run --allow-net=app.asana.com --allow-env=ASANA_ACCESS_TOKEN --allow-read src/main.ts",
+    "migrate": "deno run --allow-net=app.asana.com --allow-env=ASANA_ACCESS_TOKEN --allow-read src/main.ts migrate",
+    "survey": "deno run --allow-net=app.asana.com --allow-env=ASANA_ACCESS_TOKEN --allow-read src/main.ts survey",
     "dev": "deno run --allow-net --allow-env --allow-read src/main.ts",
     "test": "deno test --allow-env --allow-read tests/",
     "fmt": "deno fmt",
     "fmt:check": "deno fmt --check",
     "lint": "deno lint",
-    "check": "deno check src/main.ts",
+    "check": "deno check src/main.ts src/survey.ts",
     "spike:phase1": "deno run --allow-net --allow-env --allow-read spike/phase1_load.ts",
     "spike:phase2": "deno run --allow-net --allow-env --allow-read spike/phase2_api.ts"
   },
