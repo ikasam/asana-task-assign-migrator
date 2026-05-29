@@ -310,7 +310,7 @@ migrate / survey 共通の `--workspace` 値解決ロジック。要件 [R24, R2
 
 | ID | 仕様 | 状態 | 関連要件 | 依存する仮説 | 採択基準 | 下位への制約 | 未決事項 |
 |---|---|---|---|---|---|---|---|
-| S-027 | `--workspace` 値の解決: (1) `/^[0-9]+$/` に一致すれば GID 直指定として従来どおり扱う。(2) 一致しなければドメイン名とみなし、lowercase 正規化・先頭 `@` 除去（S-020 と同じ正規化）。(3) `workspacesApi.getWorkspaces({opt_fields:"gid,name,is_organization,email_domains"})` を取得し、`email_domains` に当該ドメインを含む workspace を選択。(4) 一意に解決できたらその GID で既存の `getWorkspace` pre-check に合流。0 件 / 複数件は exit 2 で、可視 workspace（GID・name・email_domains）を列挙して案内（R25）。解決は PAT 認証下で行う（追加トークン不要） | 確定 | R24, R25 | H-API8 | 数値=GID 直通 / ドメイン=一意解決 / 0・複数件で exit 2 + 列挙 | facade に `resolveWorkspace(input): Promise<{gid, name}>`（または `listWorkspaces()`）を追加。組織固有値はハードコードしない（C-016） | `email_domains` 非返却時の挙動（H-API8 棄却条件 → GID 必須へ戻す） |
+| S-027 | `--workspace` 値の解決: (1) `/^[0-9]+$/` に一致すれば GID 直指定として従来どおり扱う。(2) 一致しなければドメイン名とみなし、lowercase 正規化・先頭 `@` 除去（S-020 と同じ正規化）。(3) `workspacesApi.getWorkspaces({opt_fields:"gid,name,is_organization,email_domains"})` を取得し、`email_domains` に当該ドメインを含む workspace を選択。(4) 一意に解決できたらその GID で既存の `getWorkspace` pre-check に合流。0 件 / 複数件は exit 2 で、可視 workspace（GID・name・email_domains）を列挙して案内（R25）。解決は PAT 認証下で行う（追加トークン不要） | 確定 | R24, R25 | H-API8 | 数値=GID 直通 / ドメイン=一意解決 / 0・複数件で exit 2 + 列挙 | facade に `resolveWorkspace(input): Promise<{gid, name}>`（または `listWorkspaces()`）を追加。組織固有値はハードコードしない（C-016）。**workspace-scoped API（`getUserForWorkspace` / `listWorkspaceUsers` / `getTasks` 等）は `resolveWorkspace` が返す `gid` を使い、raw `args.workspace`（gid \| domain）を直接渡さない**（R24 で `args.workspace` が domain にもなり得るため。PR #5 R1 で survey が raw を渡し実行時破綻した実バグの再発防止） | `email_domains` 非返却時の挙動（H-API8 棄却条件 → GID 必須へ戻す） |
 
 ### 解決フロー（S-027）
 
