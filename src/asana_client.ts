@@ -37,6 +37,7 @@ export class AsanaApiErrorImpl extends Error implements AsanaApiError {
     public httpStatus: number,
     public code: string,
     public override message: string,
+    public retryAfterSec?: number,
   ) {
     super(message);
     this.name = "AsanaApiError";
@@ -45,7 +46,7 @@ export class AsanaApiErrorImpl extends Error implements AsanaApiError {
 
 // Maps any thrown value from the SDK to AsanaApiError.
 // SDK errors come from superagent; shape is roughly:
-//   { status, response: { status, body: { errors: [{message, help?}] } } }
+//   { status, response: { status, headers, body: { errors: [{message, help?}] } } }
 export function normalizeError(err: unknown): AsanaApiError {
   if (err instanceof AsanaApiErrorImpl) return err;
   if (!err || typeof err !== "object") {
@@ -59,7 +60,24 @@ export function normalizeError(err: unknown): AsanaApiError {
   const first = errors?.[0];
   const message = first?.message ?? (e.message as string) ?? "Asana API error";
   const code = inferErrorCode(status, first?.message);
-  return new AsanaApiErrorImpl(status, code, message);
+  // Preserve Retry-After (seconds) so the rate limiter can honor it after
+  // normalization; superagent drops it from the error otherwise.
+  const retryAfterSec = parseRetryAfter(res.headers);
+  return new AsanaApiErrorImpl(status, code, message, retryAfterSec);
+}
+
+// Reads a non-negative integer Retry-After (seconds) from a headers object,
+// case-insensitively. Returns undefined when absent or unparseable.
+function parseRetryAfter(headers: unknown): number | undefined {
+  if (!headers || typeof headers !== "object") return undefined;
+  const h = headers as Record<string, unknown>;
+  const raw = h["retry-after"] ?? h["Retry-After"];
+  if (typeof raw === "string") {
+    const n = parseInt(raw, 10);
+    if (Number.isFinite(n) && n >= 0) return n;
+  }
+  if (typeof raw === "number" && Number.isFinite(raw) && raw >= 0) return raw;
+  return undefined;
 }
 
 function inferErrorCode(status: number, message?: string): string {

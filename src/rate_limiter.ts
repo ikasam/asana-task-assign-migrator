@@ -85,6 +85,13 @@ export const defaultRateLimitDetector: RateLimitDetector = (err) => {
 export const defaultRetryAfterExtractor: RetryAfterExtractor = (err) => {
   if (!err || typeof err !== "object") return undefined;
   const e = err as Record<string, unknown>;
+  // Normalized AsanaApiErrorImpl carries retryAfterSec directly — superagent's
+  // Retry-After header is dropped during normalization, so prefer this.
+  if (
+    typeof e.retryAfterSec === "number" && Number.isFinite(e.retryAfterSec) && e.retryAfterSec >= 0
+  ) {
+    return e.retryAfterSec;
+  }
   const res = e.response as Record<string, unknown> | undefined;
   const headers = res?.headers as Record<string, unknown> | undefined;
   const raw = headers?.["retry-after"] ?? headers?.["Retry-After"];

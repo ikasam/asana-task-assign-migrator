@@ -35,6 +35,10 @@ export interface AsanaApiError {
   httpStatus: number;
   code: string;
   message: string;
+  // Seconds from the response's Retry-After header (429), when present. Preserved
+  // through normalization so the rate limiter can honor it instead of falling
+  // back to exponential backoff.
+  retryAfterSec?: number;
 }
 
 export interface TaskResult {
