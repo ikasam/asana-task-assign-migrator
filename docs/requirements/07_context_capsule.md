@@ -119,7 +119,7 @@
 8. **`getTasks` の `assignee` パラメータは単一識別子** — comma-separated は非対応（search の `assignee.any` とは異なる）。本ツールは 1 ユーザー対象なので問題なし。
 9. **`opt_fields` の指定を忘れると assignee 情報が返らない** — 冪等性フィルタ (S-013) で `assignee.gid` を確認するため、`opt_fields:"name,gid,assignee.gid"` の指定は必須。
 10. **subtask は `getTasks` のレスポンスに親と区別なく含まれる** (H-DOM3 確認済) — `/tasks/{gid}/subtasks` の追加走査は不要。`SubtaskMode` / `expandSubtasks` のフォールバックは削除済み (短命ツール・実機検証済みで YAGNI)。「subtask 対応が漏れているのでは?」と疑う必要なし。万一 Asana API の挙動が変わって subtask が getTasks から外れたら、`listSubtasks` ベースの BFS を再実装する。
-11. **`npm:asana` の transitive dep `debug` が import 時 `Object.keys(process.env)` を呼ぶ** — `--allow-env=<specific>` の narrow permission では SDK の import が失敗する。回避のため `src/main.ts` は SDK 系を `await import()` で lazy import し、help/version/引数検証は SDK ロード前に短絡する。permission を緩める前にこの分離を崩さないこと。
+11. **`npm:asana` の transitive dep `debug` が import 時 `Object.keys(process.env)` を呼ぶ** — `--allow-env=<specific>` の narrow permission では SDK の import が失敗する (`NotCapable: Requires env access`)。`src/main.ts` の lazy import は help/version/引数検証パスが SDK を読まずに済むようにするだけで、migration 本体では `src/asana_client.ts` が SDK を import した時点で同じ列挙が走り落ちる。narrow permission を維持する実 fix は `src/process_env_shim.ts`: SDK import の直前に `process.env` をプレーンオブジェクトへ差し替え、列挙・任意 read を通常の JS 操作にする (`src/asana_client.ts` の先頭で side-effect import)。**permission を緩める (`--allow-env` 全許可) のではなく、この shim と lazy import の分離を維持すること** (R9 / H-DENO1)。回帰固定は `tests/sdk_load.test.ts` (narrow permission の subprocess で SDK ロードを検証)。
 
 ## 上位へ戻る条件
 
