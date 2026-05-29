@@ -50,7 +50,7 @@
 
 ## 仮置き事項
 
-- レート制限ハンドリング: 最低 400ms 間隔 + 429 で Retry-After 待機、最大 3 回再試行（実装方式は H-DENO2 次第で自前 fetch にスイッチの可能性）
+- レート制限ハンドリング: 最低 400ms 間隔 + 429 (生 `status` / 正規化後 `httpStatus` 両対応) で Retry-After 待機、取得不可なら指数バックオフ、最大 3 回再試行（PR #3 で確定。facade 正規化エラーは `retryAfterSec` を保持。当初想定の自前 fetch スイッチは不要だった）
 - バージョン番号体系: 実装時に semver 採用予定
 
 ## 要検証事項
@@ -62,7 +62,7 @@
 | H-API4 | `getTasks({workspace, assignee, completed_since:"now"})` が期待通り未完了タスクをフィルタする | ✓ 採択 (2026-05-28) |
 | H-API5 | `getTasks` が Free プランでも動く | ✓ 採択 (2026-05-28) |
 | H-API6 | `getUserForWorkspace` が非メンバーで 404 を返す | ✓ 採択 (2026-05-28、検証 workspace の非メンバー email で 404 観測) |
-| H-DENO2 | superagent 経由で `err.response.headers` が読める (Retry-After 含む) | ✓ 採択 (2026-05-28、404 ケースで header object 観測。429 実観測時に最終確認) |
+| H-DENO2 | superagent 経由で `err.response.headers` が読める (Retry-After 含む) | ✓ 採択（補強）(2026-05-28 header object 観測 / 2026-05-30 PR #3: facade 正規化で `response.headers` が落ちるため `retryAfterSec` を保持する実装に補強。実 429 値は運用時に最終確認) |
 | H-DOM3 | subtask が `getTasks` のレスポンスに含まれる | ✓ 採択 (2026-05-28、検証用 parent task の subtask 2 件が当該 assignee の `getTasks` 結果に含まれ overlap=2/2)。fallback コード (`SubtaskMode` / `listSubtasks` / `expandSubtasks`) は YAGNI で削除済み (判断 24) |
 | H-DENO3 | `deno compile` で `npm:asana` を含む単一バイナリが生成・実行できる | ✓ 採択 (2026-05-28、92 MB バイナリ生成、実 API pre-check まで動作) |
 
@@ -120,6 +120,7 @@
 9. **`opt_fields` の指定を忘れると assignee 情報が返らない** — 冪等性フィルタ (S-013) で `assignee.gid` を確認するため、`opt_fields:"name,gid,assignee.gid"` の指定は必須。
 10. **subtask は `getTasks` のレスポンスに親と区別なく含まれる** (H-DOM3 確認済) — `/tasks/{gid}/subtasks` の追加走査は不要。`SubtaskMode` / `expandSubtasks` のフォールバックは削除済み (短命ツール・実機検証済みで YAGNI)。「subtask 対応が漏れているのでは?」と疑う必要なし。万一 Asana API の挙動が変わって subtask が getTasks から外れたら、`listSubtasks` ベースの BFS を再実装する。
 11. **`npm:asana` の transitive dep `debug` が import 時 `Object.keys(process.env)` を呼ぶ** — `--allow-env=<specific>` の narrow permission では SDK の import が失敗する (`NotCapable: Requires env access`)。`src/main.ts` の lazy import は help/version/引数検証パスが SDK を読まずに済むようにするだけで、migration 本体では `src/asana_client.ts` が SDK を import した時点で同じ列挙が走り落ちる。narrow permission を維持する実 fix は `src/process_env_shim.ts`: SDK import の直前に `process.env` をプレーンオブジェクトへ差し替え、列挙・任意 read を通常の JS 操作にする (`src/asana_client.ts` の先頭で side-effect import)。**permission を緩める (`--allow-env` 全許可) のではなく、この shim と lazy import の分離を維持すること** (R9 / H-DENO1)。回帰固定は `tests/sdk_load.test.ts` (narrow permission の subprocess で SDK ロードを検証)。
+12. **rate limiter は facade 正規化エラーを前提に書く** (PR #3 / FB-1) — runner が見るのは生の superagent エラーではなく `AsanaApiErrorImpl` (判断 23 で正規化済み、`httpStatus` / `retryAfterSec` を持ち `response.headers` は無い)。`defaultRateLimitDetector` は `httpStatus===429` も検知する / `normalizeError` は `Retry-After` を `retryAfterSec` に保持する、を崩さないこと。崩すと 429 が無言で指数バックオフに劣化する (survey / migrate 共通)。回帰は `rate_limiter.test.ts` の正規化 shape テスト。
 
 ## 上位へ戻る条件
 
