@@ -56,6 +56,14 @@
 - **H-DENO2 が偽の場合**（SDK が 429 Retry-After を吸収してしまう）→ 自前 fetch クライアントへの切り替えを検討。判断 7 へ戻る。
 - **新アカウントが未招待の workspace** で実行された場合 → [R4](01_requirements.md) で fail-fast するため安全側だが、ユーザー側の人手作業（招待）が必要になる。
 
+## 追加スコープ — survey サブコマンド（2026-05-29）
+
+- 移行ツールに、**移行残量を把握する読み取り専用の `survey` サブコマンド**を追加する。
+- 指定ドメイン（例 `example.com`）の email を持つアカウントが assignee の未完了タスク件数を、workspace 全体で集計する（"未移行" = まだ当該ドメインが assignee のままの未完了タスク）。
+- 既存の単一ペア移行（`migrate`）とは独立した機能で、`updateTask` は呼ばない。
+- CLI はサブコマンド制に再構成し、`migrate` / `survey` を明示必須とする（bare 呼び出しは廃止 = breaking、VERSION 0.2.0）。
+- 詳細: [判断 25〜28](06_decisions.md) / [設計選択 10, 11](04_design_options.md) / 要件 [R16〜R23](01_requirements.md)。
+
 ## 人間に最終確認した事項
 
 要件分析 [判断 1〜22](06_decisions.md) で確認済み。

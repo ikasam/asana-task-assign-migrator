@@ -21,6 +21,9 @@ type AnyApi = any;
 export interface AsanaClient {
   getWorkspace(gid: string): Promise<Workspace>;
   getUser(email: string): Promise<User>;
+  // Lists every user in the workspace (with email when visible). Used by the
+  // survey subcommand. Users whose email the PAT cannot see get email = "".
+  listWorkspaceUsers(workspaceGid: string): Promise<User[]>;
   isMemberOfWorkspace(workspaceGid: string, userIdentifier: string): Promise<boolean>;
   listAssignedIncompleteTasks(
     workspaceGid: string,
@@ -34,6 +37,7 @@ export class AsanaApiErrorImpl extends Error implements AsanaApiError {
     public httpStatus: number,
     public code: string,
     public override message: string,
+    public retryAfterSec?: number,
   ) {
     super(message);
     this.name = "AsanaApiError";
@@ -42,7 +46,7 @@ export class AsanaApiErrorImpl extends Error implements AsanaApiError {
 
 // Maps any thrown value from the SDK to AsanaApiError.
 // SDK errors come from superagent; shape is roughly:
-//   { status, response: { status, body: { errors: [{message, help?}] } } }
+//   { status, response: { status, headers, body: { errors: [{message, help?}] } } }
 export function normalizeError(err: unknown): AsanaApiError {
   if (err instanceof AsanaApiErrorImpl) return err;
   if (!err || typeof err !== "object") {
@@ -56,7 +60,25 @@ export function normalizeError(err: unknown): AsanaApiError {
   const first = errors?.[0];
   const message = first?.message ?? (e.message as string) ?? "Asana API error";
   const code = inferErrorCode(status, first?.message);
-  return new AsanaApiErrorImpl(status, code, message);
+  // Preserve Retry-After (seconds) so the rate limiter can honor it after
+  // normalization; superagent drops it from the error otherwise.
+  const retryAfterSec = parseRetryAfter(res.headers);
+  return new AsanaApiErrorImpl(status, code, message, retryAfterSec);
+}
+
+// Reads a non-negative integer Retry-After (seconds) from a headers object,
+// checking the `retry-after` / `Retry-After` casings superagent emits (matching
+// defaultRetryAfterExtractor). Returns undefined when absent or unparseable.
+function parseRetryAfter(headers: unknown): number | undefined {
+  if (!headers || typeof headers !== "object") return undefined;
+  const h = headers as Record<string, unknown>;
+  const raw = h["retry-after"] ?? h["Retry-After"];
+  if (typeof raw === "string") {
+    const n = parseInt(raw, 10);
+    if (Number.isFinite(n) && n >= 0) return n;
+  }
+  if (typeof raw === "number" && Number.isFinite(raw) && raw >= 0) return raw;
+  return undefined;
 }
 
 function inferErrorCode(status: number, message?: string): string {
@@ -115,6 +137,36 @@ export function createAsanaClient(opts: CreateAsanaClientOpts): AsanaClient {
       } catch (err) {
         throw normalizeError(err);
       }
+    },
+
+    async listWorkspaceUsers(workspaceGid: string): Promise<User[]> {
+      // GET /users?workspace=&opt_fields=name,email,gid — paginated like getTasks.
+      // Email is only returned for users the PAT can see; absent → "" sentinel.
+      const out: User[] = [];
+      try {
+        let page = await usersApi.getUsers({
+          workspace: workspaceGid,
+          opt_fields: "name,email,gid",
+          limit: 100,
+        });
+        for (;;) {
+          const data = page.data ?? [];
+          for (const u of data) {
+            out.push({
+              gid: u.gid,
+              email: (u.email ?? "").toLowerCase(),
+              name: u.name ?? "",
+            });
+          }
+          if (typeof page.nextPage !== "function") break;
+          const next = await page.nextPage();
+          if (!next || next.data == null) break;
+          page = next;
+        }
+      } catch (err) {
+        throw normalizeError(err);
+      }
+      return out;
     },
 
     async isMemberOfWorkspace(workspaceGid: string, userIdentifier: string): Promise<boolean> {

@@ -138,6 +138,31 @@
 - 実装フェーズで顕在化する判断（例: バージョン番号体系、ファイル構成、テスト戦略）はそのセッションで扱う。
 - 実装中の発見が要求 / 仕様レベルに影響する場合は、本ディレクトリへフィードバックする運用。
 
+## 追加フェーズ: survey サブコマンド（2026-05-29）
+
+移行残量を調べる読み取り専用の `survey` サブコマンドを追加する要求分析を実施。実装は本キャプセル上部の migrate と同じスタック・規約に従う。
+
+### 確定事項（survey）
+
+- `survey` サブコマンド。CLI はサブコマンド制に再構成し `migrate` / `survey` を明示必須（bare 廃止 = breaking、VERSION 0.2.0）。
+- 指定 1 ドメインの email を持つアカウントが assignee の未完了タスク件数を集計（移行先マッピング不要）。
+- 読み取り専用（`updateTask` 不使用）。アカウント別内訳（件数降順）+ 総計。人間可読 + `--json`、`--verbose`、`--quiet`。
+- 集計は migrate と同一の `getTasks(completed_since=now)`（subtask 込み、H-DOM3 採択）。
+- email 非可視ユーザーは件数を明示して続行（下限値の可能性を注記）。
+- 組織固有値（ドメイン名・workspace GID）はコードにハードコードしない（C-016、`--domain` / `--workspace` 必須）。
+- facade に `listWorkspaceUsers(ws): Promise<User[]>` を追加（`getUsers` + ページネーション、email 非可視は `email:""` センチネル）。
+
+### 後工程で忘れると危険な文脈（survey）
+
+1. `migrate` / `survey` タスクは narrow `--allow-env=ASANA_ACCESS_TOKEN` を使う。PR #2 で導入された `src/process_env_shim.ts`（`asana_client.ts` 先頭で side-effect import）が SDK import 前に `process.env` をプレーンオブジェクトへ差し替えるため、`debug` の `Object.keys(process.env)` 列挙が narrow permission でも `NotCapable` にならない。survey も `asana_client` 経由で同じ shim を通る。**broad `--allow-env` に緩めないこと**（R9 / H-DENO1、回帰固定は `tests/sdk_load.test.ts`）。
+2. 要求分析時のアドホック調査 spike（移行残量調査）は本機能で supersede → 着地後に削除。
+3. `CliArgs` 型は migrate 用。survey 用に `SurveyArgs` を新設（`migrator.ts` は `CliArgs` 依存のまま）。
+4. 集計値は email 可視アカウントに対する下限になりうる（C-017）。実測の非可視数はコードに焼き込まない。
+
+### survey の参照
+
+- 要件 [R16〜R23](01_requirements.md) / 仕様 [S-019〜S-026](03_specifications.md) / 判断 [25〜28](06_decisions.md) / 設計選択 [10, 11](04_design_options.md) / 制約 [C-016, C-017](05_constraints.md) / 仮説 [H-VAL2, H-API7](02_hypotheses.md)
+
 ## 参照リンク
 
 ### このディレクトリ内

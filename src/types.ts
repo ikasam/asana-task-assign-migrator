@@ -35,6 +35,10 @@ export interface AsanaApiError {
   httpStatus: number;
   code: string;
   message: string;
+  // Seconds from the response's Retry-After header (429), when present. Preserved
+  // through normalization so the rate limiter can honor it instead of falling
+  // back to exponential backoff.
+  retryAfterSec?: number;
 }
 
 export interface TaskResult {
@@ -71,3 +75,41 @@ export type OutputPayload =
     summary: MigrationSummary;
     results: TaskResult[];
   };
+
+// ---- survey subcommand ----
+// Read-only: counts incomplete tasks still assigned to accounts in a given
+// email domain (i.e. how much is left to migrate).
+
+export interface SurveyArgs {
+  workspace: string;
+  domain: string;
+  json: boolean;
+  verbose: boolean;
+  quiet: boolean;
+}
+
+export interface SurveyAccountResult {
+  gid: string;
+  name: string;
+  email: string;
+  count: number;
+  tasks: AsanaTask[];
+  // Present when listing this account's tasks failed (R23: continue + report).
+  error?: AsanaApiError;
+}
+
+export interface SurveyPayload {
+  mode: "survey";
+  workspace: Workspace;
+  domain: string;
+  // Total users in the workspace (all domains).
+  totalUsers: number;
+  // Users whose email the PAT could not see (cannot be domain-classified).
+  emailInvisibleUsers: number;
+  matchedAccounts: number;
+  accountsWithTasks: number;
+  totalIncompleteTasks: number;
+  // Sorted by count descending.
+  accounts: SurveyAccountResult[];
+  erroredAccounts: number;
+}
