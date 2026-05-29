@@ -67,7 +67,8 @@ export function normalizeError(err: unknown): AsanaApiError {
 }
 
 // Reads a non-negative integer Retry-After (seconds) from a headers object,
-// case-insensitively. Returns undefined when absent or unparseable.
+// checking the `retry-after` / `Retry-After` casings superagent emits (matching
+// defaultRetryAfterExtractor). Returns undefined when absent or unparseable.
 function parseRetryAfter(headers: unknown): number | undefined {
   if (!headers || typeof headers !== "object") return undefined;
   const h = headers as Record<string, unknown>;
