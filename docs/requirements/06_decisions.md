@@ -177,6 +177,7 @@
   - **unit テスト対象**: `output.ts`（フォーマッタ）、`rate_limiter.ts`（タイマー・再試行ロジック）、`cli.ts`（引数パーサ）など外部 I/O を持たない pure ロジック。
   - **テスト対象外**: `asana_client.ts`（SDK ファサード）、`migrator.ts`（pipeline）、`main.ts`（lazy import 経路）。SDK 挙動依存の層は live spike で代替。
   - **survey 追加分（2026-05-29）**: `cli.ts` の `parseSurvey`（引数検証・ドメイン正規化）と `output.ts` の `renderSurvey`（整形）は pure ロジックとして unit テスト対象。`survey.ts`（orchestration）と `asana_client.ts` の `listWorkspaceUsers` は `migrator.ts` と同じ理由でテスト対象外とし、指定 workspace × ドメインに対する live 実行で検証する（2026-05-29: 既存のアドホック調査と件数一致を確認）。
+  - **2026-05-30 補足（PR #3 フィードバック / FB-1）**: live spike も live 本実行も 429 を一度も exercise していなかったため、facade 正規化エラー (`AsanaApiErrorImpl`) shape での 429 検知・Retry-After 抽出の不具合（[H-DENO2](02_hypotheses.md) 補強 / [S-007](03_specifications.md)）を検出できなかった。`rate_limiter.ts` の `defaultRateLimitDetector` / `defaultRetryAfterExtractor` を、正規化エラー shape（`{httpStatus:429}` / `{retryAfterSec}`）に対する unit テストで回帰固定した（pure ロジックなので本テスト戦略のテスト対象内）。教訓: 「全パスで X が成立」型の受入基準は、live が踏まないパス（ここでは 429）を **単体テストで補完**しないと潜在不具合が残る。
 - **回帰検出の範囲と限界**:
   - `deno check` + `deno lint` + `deno fmt` を必須ゲートとする。
   - **検出できる**: `AsanaClient` interface とその実装、ファサード境界の app 側型 (`Workspace` / `User` / `AsanaTask`)、`migrator.ts` / `output.ts` 側のシグネチャ不整合。

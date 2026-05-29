@@ -12,7 +12,7 @@
 | S-004 | dry-run 出力: 人間可読では workspace/from/to/件数/タスク一覧、`--json` では構造化 JSON | 確定 | R5 | — | サンプル出力と一致 | — | JSON スキーマの厳密化は実装時 |
 | S-005 | 実行レポート: per-task `[N/M] gid name ✓/✗` + 末尾の Total/Success/Failed/Failures 一覧 | 確定 | R7 | — | サンプル出力と一致 | `--quiet` で per-task 行を省略 | — |
 | S-006 | 終了コード: 0=全件成功 or 確認で N or dry-run / 1=一部失敗 / 2=実行前エラー | 確定 | R4, R7, R12, R15 | — | 各ケースで規定の exit code | — | — |
-| S-007 | レート制限: 最低 400ms 間隔 + 429 で Retry-After 待機、最大 3 回再試行 | 仮置き | R8 | H-DENO2 | 150 req/min を超えない & 再試行で復帰 | — | superagent 経由で Retry-After が取れない場合は自前 fetch |
+| S-007 | レート制限: 最低 400ms 間隔 + 429 (生の `status` / 正規化後の `httpStatus` の両方で検知) で Retry-After 待機、取得不可なら指数バックオフ (2/4/8s)、最大 3 回再試行 | 確定 | R8 | H-DENO2 | 150 req/min を超えない & 再試行で復帰 | facade 正規化エラー (`AsanaApiErrorImpl`) は `retryAfterSec` を保持すること (未保持だと 429 未検知 / Retry-After 無視に劣化、survey/migrate 両方に影響) | 実 429 の Retry-After 値は運用時に最終確認 |
 | S-008 | エラーストリーム規約: 進捗は stdout / エラーは stderr / `--json` は全 stdout で内部に errors キー | 確定 | R7, R13, R14 | — | リダイレクトで分離可能 | — | — |
 | S-009 | 確認プロンプト: 本実行時のみ表示、Y/y または yes 入力で続行、他は中断 (exit 0)。`--yes` でスキップ | 確定 | R15 | — | プロンプトに従って分岐 | TTY 判定は実装しない（非対話環境は想定外） | — |
 | S-010 | API シーケンス: `getWorkspace` → `getUser(from)` → `getUser(to)` → `getUserForWorkspace(ws, to)` → `getTasks` (paginated) → `updateTask` × N | 確定 | R1, R4, R6 | H-API3, H-API4, H-API6 | 各 API 呼び出しが規定順序で発生 | — | — |
@@ -232,7 +232,7 @@ Re-run the same command to retry failed tasks (idempotent).
 | S-020 | `survey` 引数: `--workspace <gid>`（必須・数値）/ `--domain <domain>`（必須）/ `--json` / `--verbose` / `--quiet`。domain 妥当性は「`@`・空白を含まず、少なくとも 1 つのドット区切りラベルを持つ」こと、lowercase 正規化、先頭 `@` は許容して除去 | 確定 | R16 | — | 不正値で exit 2 | migrate 専用フラグ（`--from`/`--to`/`--dry-run`/`--yes`）は survey では Unknown option | — |
 | S-021 | survey 実行フロー: pre-check（`getWorkspace`）→ 全ユーザー列挙 → domain フィルタ → 対象ごとに未完了タスク件数集計（per-account エラーは記録して継続）→ 件数降順でレンダリング | 確定 | R17, R18, R19, R23 | H-API7, H-API4 | 各ステップが順序通り実行 | — | — |
 | S-022 | survey API シーケンス: `getWorkspace` → `getUsers`（paginated）→ `getTasks({assignee, completed_since:"now"})` × 対象数。`updateTask` は呼ばない | 確定 | R18, R21 | H-API4, H-API7, H-DOM3 | 規定順序で API 発生、更新系を呼ばない | — | — |
-| S-023 | survey 出力: 人間可読では workspace / domain / 総ユーザー数 / 対象数 / email 非可視数の注記 / アカウント別（件数降順）/ サマリ。`--json` では構造化 JSON | 確定 | R19, R20, R22 | — | サンプル出力と一致 | `--quiet` は内訳を省きサマリのみ | — |
+| S-023 | survey 出力: 人間可読では workspace / domain / 総ユーザー数 / 対象数 / email 非可視数の注記 / アカウント別（件数降順）/ サマリ。`--json` では構造化 JSON | 確定 | R19, R20, R22, R23 | — | サンプル出力と一致 | `--quiet` は per-account の件数内訳を省くが、errored account は summary 後に必ず列挙する（R23 継続+報告、migrate の R7 と整合） | — |
 | S-024 | survey 終了コード: 2=使用法/pre-check 失敗 / 1=完了したが per-account エラーあり / 0=正常完了 | 確定 | R23 | — | 各ケースで規定の exit code | — | — |
 | S-025 | facade 拡張: `listWorkspaceUsers(workspaceGid): Promise<User[]>`（`getUsers` + ページネーション）。email 非可視ユーザーは `email:""` をセンチネルにし、survey 側で非可視と判定 | 確定 | R17, R20 | H-API7 | 全ユーザーを flat array で返す | — | — |
 | S-026 | survey は読み取り専用契約: `updateTaskAssignee` を含む更新系を一切呼ばない | 確定 | R21 | — | コード上 update 呼び出しが無い | — | — |
