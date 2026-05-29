@@ -8,6 +8,10 @@
 // All API methods are wrapped by the caller in the rate-limiter, not here, so this
 // module stays free of timing concerns.
 
+// MUST precede the "asana" import: neutralizes debug@4.4.3's import-time
+// `Object.keys(process.env)` so the SDK loads under the narrow
+// `--allow-env=ASANA_ACCESS_TOKEN` permission. See src/process_env_shim.ts.
+import "./process_env_shim.ts";
 import Asana from "asana";
 import type { AsanaApiError, AsanaTask, User, Workspace } from "./types.ts";
 
