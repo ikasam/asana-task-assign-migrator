@@ -133,9 +133,9 @@ export function createAsanaClient(opts: CreateAsanaClientOpts): AsanaClient {
     },
 
     async listWorkspaces(): Promise<Workspace[]> {
-      // GET /workspaces?opt_fields=name,is_organization,email_domains — paginated
-      // like getUsers/getTasks. email_domains is only populated for organizations
-      // (and subject to the same PAT visibility limits as other fields, C-018).
+      // GET /workspaces?opt_fields=gid,name,is_organization,email_domains —
+      // paginated like getUsers/getTasks. email_domains is only populated for
+      // organizations (and subject to the same PAT visibility limits, C-018).
       const out: Workspace[] = [];
       try {
         let page = await workspacesApi.getWorkspaces({
