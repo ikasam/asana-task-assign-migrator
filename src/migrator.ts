@@ -88,12 +88,12 @@ export async function resolveWorkspace(
   if (matches.length === 0) {
     throw new PreCheckError(
       `no workspace found for domain "${domain}".`,
-      workspaceListHint(workspaces),
+      workspaceListHint(workspaces, "Visible workspaces (use --workspace <gid> directly):"),
     );
   }
   throw new PreCheckError(
     `domain "${domain}" matches multiple workspaces.`,
-    workspaceListHint(matches),
+    workspaceListHint(matches, "Matching workspaces (use --workspace <gid> directly):"),
   );
 }
 
@@ -107,7 +107,7 @@ function workspaceLookupError(message: string, e: unknown): PreCheckError {
   );
 }
 
-function workspaceListHint(workspaces: Workspace[]): string {
+function workspaceListHint(workspaces: Workspace[], header: string): string {
   if (workspaces.length === 0) {
     return "No workspaces are visible to this token.";
   }
@@ -124,7 +124,7 @@ function workspaceListHint(workspaces: Workspace[]): string {
     }
     return `  ${w.gid}  ${w.name}  ${tag}`;
   });
-  return "Visible workspaces (use --workspace <gid> directly):\n" + lines.join("\n");
+  return header + "\n" + lines.join("\n");
 }
 
 export interface RunMigrationOpts {
