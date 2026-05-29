@@ -154,7 +154,7 @@
 
 ### 後工程で忘れると危険な文脈（survey）
 
-1. `deno task survey` の env permission は migrate と同じ `debug` の `Object.keys(process.env)` 問題を踏む。migrate task の narrow `--allow-env` 修正（別タスクでフラグ済み）と整合させる。`dev`（broad `--allow-env`）では動作確認可。
+1. `migrate` / `survey` タスクは broad `--allow-env` を使う。narrow `--allow-env=ASANA_ACCESS_TOKEN` だと transitive dep `debug` が import 時に `Object.keys(process.env)` で全 env を列挙して `NotCapable` で失敗するため（[H-DENO1](02_hypotheses.md) 参照）。narrow permission を復活させる（`debug` の shim 等）のは将来課題。
 2. 要求分析時のアドホック調査 spike（移行残量調査）は本機能で supersede → 着地後に削除。
 3. `CliArgs` 型は migrate 用。survey 用に `SurveyArgs` を新設（`migrator.ts` は `CliArgs` 依存のまま）。
 4. 集計値は email 可視アカウントに対する下限になりうる（C-017）。実測の非可視数はコードに焼き込まない。

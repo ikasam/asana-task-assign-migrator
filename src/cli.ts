@@ -34,12 +34,15 @@ const GID_RE = /^[0-9]+$/;
 
 export function parseArgs(argv: readonly string[]): ParseResult {
   const first = argv[0];
-  // Top-level help / version (no subcommand, or as the very first token).
-  if (first === undefined || first === "-h" || first === "--help") {
-    return { kind: "help" };
-  }
-  if (first === "-V" || first === "--version") {
-    return { kind: "version" };
+  // Explicit help / version are top-level; a missing subcommand is a usage error
+  // (S-019: a subcommand is required, so bare invocation exits 2).
+  if (first === "-h" || first === "--help") return { kind: "help" };
+  if (first === "-V" || first === "--version") return { kind: "version" };
+  if (first === undefined) {
+    throw new CliUsageError(
+      "Missing subcommand.",
+      "Expected 'migrate' or 'survey'. See --help for usage.",
+    );
   }
   if (first === "migrate") return parseMigrate(argv.slice(1));
   if (first === "survey") return parseSurvey(argv.slice(1));

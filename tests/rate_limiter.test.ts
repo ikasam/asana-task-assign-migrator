@@ -161,3 +161,14 @@ Deno.test("defaultRetryAfterExtractor: returns undefined when absent", () => {
   assertEquals(defaultRetryAfterExtractor(null), undefined);
   assertEquals(defaultRetryAfterExtractor("not-an-object"), undefined);
 });
+
+Deno.test("defaultRateLimitDetector: recognizes all 429 shapes", () => {
+  assertEquals(defaultRateLimitDetector({ status: 429 }), true);
+  // Normalized AsanaApiErrorImpl shape (httpStatus, not status).
+  assertEquals(defaultRateLimitDetector({ httpStatus: 429 }), true);
+  assertEquals(defaultRateLimitDetector({ response: { status: 429 } }), true);
+  assertEquals(defaultRateLimitDetector({ status: 403 }), false);
+  assertEquals(defaultRateLimitDetector({ httpStatus: 500 }), false);
+  assertEquals(defaultRateLimitDetector(null), false);
+  assertEquals(defaultRateLimitDetector("nope"), false);
+});

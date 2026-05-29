@@ -65,12 +65,16 @@ export function createThrottledRunner(opts: ThrottledRunnerOptions) {
   };
 }
 
-// Default detector for superagent-shaped errors (npm:asana wraps superagent).
-// Conservative: treat anything resembling a 429 status as rate-limit.
+// Default detector for both superagent-shaped errors (raw npm:asana) and the
+// normalized AsanaApiErrorImpl that asana_client throws (which exposes
+// `httpStatus`, not `status`/`response.status`). The facade normalizes before
+// the runner sees the error, so without the `httpStatus` check 429s would slip
+// through undetected and never retry.
 export const defaultRateLimitDetector: RateLimitDetector = (err) => {
   if (!err || typeof err !== "object") return false;
   const e = err as Record<string, unknown>;
   if (e.status === 429) return true;
+  if (e.httpStatus === 429) return true;
   const res = e.response as Record<string, unknown> | undefined;
   if (res && res.status === 429) return true;
   return false;

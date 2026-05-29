@@ -60,7 +60,15 @@ export async function runSurvey(opts: RunSurveyOpts): Promise<ExitCode> {
   for (const u of matched) {
     try {
       const tasks = await run(() => client.listAssignedIncompleteTasks(args.workspace, u.gid));
-      accounts.push({ gid: u.gid, name: u.name, email: u.email, count: tasks.length, tasks });
+      // Only retain per-task detail when --json needs it; otherwise keep just the
+      // count so large workspaces don't hold every task across all accounts.
+      accounts.push({
+        gid: u.gid,
+        name: u.name,
+        email: u.email,
+        count: tasks.length,
+        tasks: args.json ? tasks : [],
+      });
     } catch (e) {
       accounts.push({
         gid: u.gid,

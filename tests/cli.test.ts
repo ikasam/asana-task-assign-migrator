@@ -3,8 +3,8 @@ import { CliUsageError, parseArgs } from "../src/cli.ts";
 
 // ---- top-level dispatch ----
 
-Deno.test("parseArgs: no subcommand → help", () => {
-  assertEquals(parseArgs([]).kind, "help");
+Deno.test("parseArgs: no subcommand → usage error (exit 2)", () => {
+  assertThrows(() => parseArgs([]), CliUsageError, "Missing subcommand");
 });
 
 Deno.test("parseArgs: -h/--help short-circuit to help", () => {
