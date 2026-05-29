@@ -227,8 +227,7 @@ Deno.test("renderSurvey (json): single JSON object on stdout", () => {
   assertEquals(parsed.accounts.length, 2);
 });
 
-Deno.test("renderSurvey (human): per-account error surfaced", () => {
-  const cap = captureWriter();
+Deno.test("renderSurvey: per-account error surfaced in human and quiet (R23)", () => {
   const withErr: SurveyPayload = {
     ...surveyPayload,
     erroredAccounts: 1,
@@ -244,8 +243,16 @@ Deno.test("renderSurvey (human): per-account error surfaced", () => {
       },
     ],
   };
+
+  const cap = captureWriter();
   renderSurvey(surveyArgs, withErr, cap.w);
   const text = cap.out();
-  assertStringIncludes(text, "! Carol <carol@example.com>: ERROR HTTP 403 not_authorized");
+  assertStringIncludes(text, "Errored accounts (task counts unavailable):");
+  assertStringIncludes(text, "Carol <carol@example.com>: HTTP 403 not_authorized");
   assertStringIncludes(text, "accounts that errored");
+
+  // --quiet still reports errored accounts (continue + report).
+  const capQ = captureWriter();
+  renderSurvey({ ...surveyArgs, quiet: true }, withErr, capQ.w);
+  assertStringIncludes(capQ.out(), "Carol <carol@example.com>: HTTP 403 not_authorized");
 });

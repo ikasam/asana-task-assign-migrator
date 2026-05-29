@@ -184,10 +184,7 @@ export function renderSurvey(
     lines.push(`Incomplete tasks still assigned to @${payload.domain} accounts:`);
     lines.push("");
     for (const a of payload.accounts) {
-      if (a.error) {
-        lines.push(`  ! ${a.name} <${a.email}>: ERROR HTTP ${a.error.httpStatus} ${a.error.code}`);
-        continue;
-      }
+      if (a.error) continue; // errored accounts are listed in their own section below
       lines.push(`  ${String(a.count).padStart(5)}  ${a.name} <${a.email}>`);
     }
   }
@@ -199,6 +196,19 @@ export function renderSurvey(
   lines.push(`unmigrated incomplete tasks : ${payload.totalIncompleteTasks}`);
   if (payload.erroredAccounts > 0) {
     lines.push(`accounts that errored       : ${payload.erroredAccounts}`);
+  }
+
+  // Errored accounts are reported even in --quiet (R23: continue + report,
+  // matching how migrate surfaces failures regardless of quiet).
+  const errored = payload.accounts.filter((a) => a.error);
+  if (errored.length > 0) {
+    lines.push("");
+    lines.push("Errored accounts (task counts unavailable):");
+    for (const a of errored) {
+      const e = a.error;
+      if (!e) continue;
+      lines.push(`  ${a.name} <${a.email}>: HTTP ${e.httpStatus} ${e.code}`);
+    }
   }
   w.out(lines.join("\n") + "\n");
 }

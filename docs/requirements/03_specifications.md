@@ -294,7 +294,7 @@ unmigrated incomplete tasks : 301
   "accounts": [
     {
       "gid": "111", "name": "Alice Example", "email": "alice@example.com", "count": 62,
-      "tasks": [ { "gid": "9876543210", "name": "Q2 planning document" } ]
+      "tasks": [ { "gid": "9876543210", "name": "Q2 planning document", "assigneeGid": "111" } ]
     }
   ],
   "erroredAccounts": 0
