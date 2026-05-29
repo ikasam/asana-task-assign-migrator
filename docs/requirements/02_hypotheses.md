@@ -21,7 +21,7 @@
 | H-DENO3 | 実装 | `deno compile` で npm:asana を含む単一バイナリを生成できる | Deno 2.x の npm 互換 + 実機検証 | 採択 | 2026-05-28 実機検証: `deno compile --allow-net=app.asana.com --allow-env --allow-read --output dist/asana-task-assign-migrator src/main.ts` で 92 MB の単一バイナリを生成。--help / --version / 引数バリデーション / PAT 未設定 / 実 API pre-check (workspace + getUser) まで全て動作 | バイナリが生成・実行可能 | — | — |
 | H-VAL2 | 価値 | 移行残量をドメイン単位で可視化できると、移行の進捗把握・完了判断・優先順位付けに役立つ | survey 機能の動機（W-008） | 仮置き | 実利用フィードバック | 移行運用で「残りどれだけか」を即答できる | 残量把握が一度きりで継続価値が無いと判明 | ikasam |
 | H-API7 | 実装 | `usersApi.getUsers({workspace, opt_fields})` で workspace 全ユーザーを email 付きで列挙できる（標準ページネーション） | SDK 型定義 + 実機検証 | 採択（補強） | 2026-05-29 実機検証: 714 ユーザーを列挙。ただし 97 ユーザーは email を返さず（PAT 可視性制約 → C-017） | 全ユーザーを列挙でき、大半で email 取得可 | email が全く取れない / ページネーションが破綻 | — |
-| H-API8 | 実装 | `workspacesApi.getWorkspaces({opt_fields:"name,is_organization,email_domains"})` が当該 PAT に対し organization の `email_domains` を返し、ドメイン照合で workspace を一意特定できる | Asana 公式 doc（`is_organization` は確認済、organization は会社を表す特別な workspace）+ 要検証 | 要検証 | 実装フェーズ初期に 1-call spike（`GET /workspaces?opt_fields=name,is_organization,email_domains`）で観測 | 対象 org の `email_domains` が返り、指定ドメインで workspace を一意特定できる | `email_domains` が返らない（C-017 同様の可視性欠落）/ 同一ドメインが複数 workspace に跨る | Asana 公式 / 実機 |
+| H-API8 | 実装 | `workspacesApi.getWorkspaces({opt_fields:"gid,name,is_organization,email_domains"})` が当該 PAT に対し organization の `email_domains` を返し、ドメイン照合で workspace を一意特定できる | Asana 公式 doc（`is_organization` は確認済、organization は会社を表す特別な workspace）+ 要検証 | 要検証 | 実装フェーズ初期に 1-call spike（`GET /workspaces?opt_fields=gid,name,is_organization,email_domains`）で観測 | 対象 org の `email_domains` が返り、指定ドメインで workspace を一意特定できる | `email_domains` が返らない（C-017 同様の可視性欠落）/ 同一ドメインが複数 workspace に跨る | Asana 公式 / 実機 |
 
 ## 仮説検証計画
 
@@ -35,7 +35,7 @@
 | H-DOM3 | 実装フェーズ初期 | subtask に対する `getTasks` ヒット有無、`updateTask` の挙動 | レスポンス内容 | subtask 含むことが確認できれば [R1](01_requirements.md) と整合 | subtask が getTasks に出てこない場合は `/tasks/{gid}/subtasks` を別途走査 | R1 の実装方式変更 |
 | H-INT1 | 利用フェーズ | プロンプト承認率 / `--yes` 使用率 | 利用者ヒアリング | UX 維持 | プロンプト省略やデフォルト動作を見直し | 判断 19e 再検討 |
 | H-API7 | survey 実装時 | `getUsers` の email 返却率 | 列挙ユーザー数 / email 欠落数 | R20 の注記文言を確定 | email 欠落が多すぎる場合は別手段（`getUserForWorkspace` 個別）を検討 | 判断 27 を再開 |
-| H-API8 | ドメイン解決の実装フェーズ初期 | `GET /workspaces?opt_fields=name,is_organization,email_domains` の返却内容 | 各 workspace の `is_organization` / `email_domains` | R24 のドメイン解決ロジックを確定 | `email_domains` が返らなければドメイン解決を断念し GID 必須へ戻す（C-014 を維持）。複数一致なら R25 の列挙で人手に委ねる | 判断 29 を再開 |
+| H-API8 | ドメイン解決の実装フェーズ初期 | `GET /workspaces?opt_fields=gid,name,is_organization,email_domains` の返却内容 | 各 workspace の `is_organization` / `email_domains` | R24 のドメイン解決ロジックを確定 | `email_domains` が返らなければドメイン解決を断念し GID 必須へ戻す（C-014 を維持）。複数一致なら R25 の列挙で人手に委ねる | 判断 29 を再開 |
 
 ## 仮説層と検証エビデンスの対応
 
