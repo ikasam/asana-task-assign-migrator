@@ -72,8 +72,18 @@ export async function resolveWorkspace(
 
   const matches = workspaces.filter((w) => (w.emailDomains ?? []).includes(domain));
   if (matches.length === 1) {
-    // Return the {gid,name} shape getWorkspace yields; drop resolution-only fields.
-    return { gid: matches[0].gid, name: matches[0].name };
+    // Re-fetch via getWorkspace so the domain path gets the same canonical
+    // access/404 validation as the numeric-GID path (S-027: "getWorkspace
+    // pre-check に合流").
+    try {
+      return await run(() => client.getWorkspace(matches[0].gid));
+    } catch (e) {
+      throw workspaceLookupError(
+        `workspace not found or no access ` +
+          `(gid=${matches[0].gid}, resolved from domain "${domain}")`,
+        e,
+      );
+    }
   }
   if (matches.length === 0) {
     throw new PreCheckError(
@@ -103,7 +113,15 @@ function workspaceListHint(workspaces: Workspace[]): string {
   }
   const lines = workspaces.map((w) => {
     const domains = w.emailDomains ?? [];
-    const tag = domains.length > 0 ? `[${domains.join(", ")}]` : "(not an organization, no domain)";
+    let tag: string;
+    if (domains.length > 0) {
+      tag = `[${domains.join(", ")}]`;
+    } else if (w.isOrganization === false) {
+      tag = "(not an organization, no domain)";
+    } else {
+      // Organization (or unknown) but no email domains visible to this PAT (C-018).
+      tag = "(organization; no email domains visible to this token)";
+    }
     return `  ${w.gid}  ${w.name}  ${tag}`;
   });
   return "Visible workspaces (use --workspace <gid> directly):\n" + lines.join("\n");
