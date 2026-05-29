@@ -139,7 +139,7 @@ export function createAsanaClient(opts: CreateAsanaClientOpts): AsanaClient {
       const out: Workspace[] = [];
       try {
         let page = await workspacesApi.getWorkspaces({
-          opt_fields: "name,is_organization,email_domains",
+          opt_fields: "gid,name,is_organization,email_domains",
           limit: 100,
         });
         for (;;) {
