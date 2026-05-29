@@ -20,6 +20,9 @@ type AnyApi = any;
 
 export interface AsanaClient {
   getWorkspace(gid: string): Promise<Workspace>;
+  // Lists every workspace visible to the PAT, with is_organization / email_domains
+  // so the caller can resolve a --workspace domain to a GID (S-027 / R24).
+  listWorkspaces(): Promise<Workspace[]>;
   getUser(email: string): Promise<User>;
   // Lists every user in the workspace (with email when visible). Used by the
   // survey subcommand. Users whose email the PAT cannot see get email = "".
@@ -127,6 +130,39 @@ export function createAsanaClient(opts: CreateAsanaClientOpts): AsanaClient {
       } catch (err) {
         throw normalizeError(err);
       }
+    },
+
+    async listWorkspaces(): Promise<Workspace[]> {
+      // GET /workspaces?opt_fields=gid,name,is_organization,email_domains —
+      // paginated like getUsers/getTasks. email_domains is only populated for
+      // organizations (and subject to the same PAT visibility limits, C-018).
+      const out: Workspace[] = [];
+      try {
+        let page = await workspacesApi.getWorkspaces({
+          opt_fields: "gid,name,is_organization,email_domains",
+          limit: 100,
+        });
+        for (;;) {
+          const data = page.data ?? [];
+          for (const w of data) {
+            out.push({
+              gid: w.gid,
+              name: w.name ?? "",
+              isOrganization: w.is_organization ?? false,
+              emailDomains: Array.isArray(w.email_domains)
+                ? w.email_domains.map((d: string) => String(d).toLowerCase())
+                : [],
+            });
+          }
+          if (typeof page.nextPage !== "function") break;
+          const next = await page.nextPage();
+          if (!next || next.data == null) break;
+          page = next;
+        }
+      } catch (err) {
+        throw normalizeError(err);
+      }
+      return out;
     },
 
     async getUser(emailOrGid: string): Promise<User> {

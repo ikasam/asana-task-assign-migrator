@@ -17,6 +17,13 @@ export interface CliArgs {
 export interface Workspace {
   gid: string;
   name: string;
+  // Populated only by listWorkspaces (for --workspace domain resolution, S-027).
+  // isOrganization is whether the workspace is an organization; emailDomains holds
+  // its registered email domains. An organization may still return an empty
+  // emailDomains when the PAT cannot see them (C-018), so do NOT infer "not an
+  // organization" from an empty emailDomains. getWorkspace leaves both undefined.
+  isOrganization?: boolean;
+  emailDomains?: string[];
 }
 
 export interface User {

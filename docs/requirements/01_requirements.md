@@ -3,6 +3,8 @@
 要望（あいまいな「したい」）から要件（検証可能な記述）まで 3 層で整理。
 
 > **2026-05-29 追加フェーズ**: 移行残量を調べる読み取り専用の `survey` サブコマンドの要求を追記（W-008 / D-013〜D-017 / R16〜R23）。背景は[判断 25〜28](06_decisions.md)・[設計選択 10〜11](04_design_options.md)・[制約 C-016, C-017](05_constraints.md)を参照。
+>
+> **2026-05-30 追加フェーズ**: `--workspace` をドメイン名でも指定できるようにする UX 改善要求を追記（W-009 / D-018 / R24〜R25）。GID を手で調べる手間を省くため、ドメインを `GET /workspaces` の `email_domains` 照合で GID に解決する。背景は[判断 29〜30](06_decisions.md)・[制約 C-014（緩和）, C-018](05_constraints.md)・[仮説 H-API8](02_hypotheses.md)を参照。
 
 ## 要望候補
 
@@ -16,6 +18,7 @@
 | W-006 | 「ブラウザを経由するアカウントの認証フローを通して一時トークンを取得する仕様は実現可能？」 | 認証 UX の改善案として OAuth を検討したい | ikasam | 制約確認の結果、現状は PAT 採用 |
 | W-007 | 「非対話環境は想定外でよい」 | ツールは人間による起動・実行のみを想定する | ikasam | CI 利用は対象外 |
 | W-008 | 「特定ドメインのアカウントが担当している未完了タスクがどれだけ移行できていないか調べたい」 | 移行作業の残量をドメイン単位で可視化したい | ikasam | 2026-05-29 追加。単一ペア移行とは別の読み取り専用調査 |
+| W-009 | 「workspace 指定のために ID を調べて入力するのはユーザーからすると不便。CLI option では workspace のドメイン名を渡し、API で ID を解決したい」 | workspace を GID ではなく覚えやすいドメイン名で指定したい | ikasam | 2026-05-30 追加。UX 改善（GID 調査の手間を解消） |
 
 ## 要求候補
 
@@ -40,6 +43,7 @@
 | D-015 | 読み取り専用。`updateTask` を一切呼ばない | W-008 | migrate と異なり破壊操作なし | 確定 | なし |
 | D-016 | email 非可視ユーザーの存在を結果に明示する（集計の信頼性注記） | W-008 | 一部ユーザーが email を返さない（C-017）→ 件数明示して続行（判断 27） | 確定 | なし |
 | D-017 | 既存の workspace 指定 / PAT / レート制限 / 出力モード枠組みを再利用する | W-008 | コード重複回避とふるまい一貫性 | 確定 | なし |
+| D-018 | CLI は workspace を人間可読なドメイン名で受け取り、API で GID に解決できるようにする（GID 直指定も従来どおり受ける） | W-009 | 「ドメイン名」は workspace 表示名ではなく organization の登録 email ドメイン。素の workspace（非 organization）には適用不可 → C-018。既存 `--domain`（survey の assignee 用）との命名衝突 → 判断 29 で解消 | 確定 | email_domains が PAT に返るか（H-API8 要検証） |
 
 ## 要件候補
 
@@ -70,6 +74,8 @@
 | R21 | survey は読み取り専用とし、`updateTask` を呼ばない | システム x 非機能 | 確定 | D-015 | — | — |
 | R22 | survey 出力は人間可読（既定）+ `--json`、`--verbose` で API debug を stderr、`--quiet` で内訳を省略しサマリのみ | システム x 機能 | 確定 | D-014, D-017 / 判断 28 | — | — |
 | R23 | per-account のタスク取得エラーは記録して継続し、末尾に列挙する（migrate の R7 を踏襲） | システム x 機能 | 確定 | D-017 | — | — |
+| R24 | `--workspace` の値が GID（数値）でないときはドメイン名とみなし、`GET /workspaces`（`opt_fields=gid,name,is_organization,email_domains`）の `email_domains` 照合で GID に解決する。数値なら従来どおり GID 直指定。migrate / survey の両方に適用 | システム x 機能 | 確定 | D-018 / 判断 29, 30 | H-API8 | email_domains の PAT 可視性（H-API8） |
+| R25 | ドメイン解決が 0 件 / 複数件のときは fail-fast（exit 2）し、PAT に可視な workspace（GID・name・email_domains）を列挙して案内する | システム x 機能 | 確定 | D-018 / 判断 30 | H-API8 | — |
 
 ## 種別の凡例
 

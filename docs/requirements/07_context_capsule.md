@@ -164,6 +164,29 @@
 
 - 要件 [R16〜R23](01_requirements.md) / 仕様 [S-019〜S-026](03_specifications.md) / 判断 [25〜28](06_decisions.md) / 設計選択 [10, 11](04_design_options.md) / 制約 [C-016, C-017](05_constraints.md) / 仮説 [H-VAL2, H-API7](02_hypotheses.md)
 
+## 追加フェーズ: `--workspace` のドメイン指定（2026-05-30）
+
+GID を手で調べる UX を解消するため、`--workspace` をドメイン名でも指定できるようにする要求分析を実施。実装は migrate / survey と同じスタック・規約に従う。
+
+### 確定事項（workspace ドメイン解決）
+
+- `--workspace` は **GID（数値）またはドメイン名**を受け付ける（判断 29-A: `--workspace` を拡張、新フラグ無し・後方互換維持）。
+- ドメインのときは `workspacesApi.getWorkspaces({opt_fields:"gid,name,is_organization,email_domains"})` の `email_domains` 照合で GID に解決（S-027）。0 件 / 複数件は exit 2 + 可視 workspace 列挙（R25）。
+- **migrate / survey の両方**に適用（判断 30）。解決ロジックは facade に一本化。
+- C-014「GID 必須」は本フェーズで**緩和**。組織固有値はハードコードしない（C-016 継続）。
+
+### 後工程で忘れると危険な文脈（workspace ドメイン解決）
+
+1. **「workspace のドメイン名」≠「workspace 表示名」**。解決キーは organization の登録 email ドメイン（`email_domains`）。表示名指定は**同名 workspace の曖昧性**のため引き続き非対応（判断 29 / README 制限事項）。
+2. **`--workspace` のドメイン と survey の `--domain` は別物**。前者は「どの org か」を特定するキー、後者は「集計対象の assignee ドメイン」。survey では両方がドメイン値を取り得るので help / 実装コメントで役割を明記する（混同すると集計対象を取り違える）。
+3. **`email_domains` の返却は要検証（H-API8）+ PAT 可視性リスク（C-018 / C-017 と同種）**。実装初手で 1-call spike（`GET /workspaces?opt_fields=gid,name,is_organization,email_domains`）。返らなければドメイン解決を断念し GID 必須へ戻す（C-014 維持）。
+4. **素の workspace（`is_organization=false`）はドメインを持たない** → ドメイン解決の対象外。GID 指定にフォールバックさせる（エラーメッセージで案内）。
+5. **数値判定は `/^[0-9]+$/`**。GID は数値文字列、ドメインは必ずドットを含むので auto-detect の衝突は無い。数値パスは `getWorkspaces` を呼ばず従来どおり API 1 回節約。
+
+### workspace ドメイン解決の参照
+
+- 要望 [W-009](01_requirements.md) / 要求 [D-018](01_requirements.md) / 要件 [R24, R25](01_requirements.md) / 仕様 [S-027](03_specifications.md) / 判断 [29, 30](06_decisions.md) / 制約 [C-014（緩和）, C-018](05_constraints.md) / 仮説 [H-API8](02_hypotheses.md)
+
 ## 参照リンク
 
 ### このディレクトリ内

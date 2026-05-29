@@ -6,7 +6,7 @@
 
 | ID | 仕様 | 状態 | 関連要件 | 依存する仮説 | 採択基準 | 下位への制約 | 未決事項 |
 |---|---|---|---|---|---|---|---|
-| S-001 | CLI シグネチャ（必須 `--workspace`/`--from`/`--to`、オプション `--dry-run`/`--json`/`--quiet`/`--verbose`/`--yes`/`-h`/`-V`） | 確定 | R2, R5, R13, R14, R15 | — | 実装が同じシグネチャで動く | 全フラグの命名と短縮形を守る | — |
+| S-001 | CLI シグネチャ（必須 `--workspace`/`--from`/`--to`、オプション `--dry-run`/`--json`/`--quiet`/`--verbose`/`--yes`/`-h`/`-V`）。`--workspace` は GID（数値）またはドメイン名を受け付ける（解決は [S-027](#workspace-指定のドメイン解決2026-05-30-追加s-027)） | 確定 | R2, R5, R13, R14, R15, R24 | H-API8 | 実装が同じシグネチャで動く | 全フラグの命名と短縮形を守る | — |
 | S-002 | 環境変数 `ASANA_ACCESS_TOKEN` は必須。未設定時は exit 2 + ガイドリンク付きエラー | 確定 | R9, R12 | — | 未設定起動で exit 2 を観測 | — | — |
 | S-003 | 実行フロー: Pre-checks → Task discovery → 冪等性フィルタ → 確認プロンプト → Execution → Reporting | 確定 | R1, R4, R5, R6, R7, R15 | H-API4, H-API6 | 各ステップが順序通り実行される | — | — |
 | S-004 | dry-run 出力: 人間可読では workspace/from/to/件数/タスク一覧、`--json` では構造化 JSON | 確定 | R5 | — | サンプル出力と一致 | — | JSON スキーマの厳密化は実装時 |
@@ -31,7 +31,8 @@
 asana-task-assign-migrator [OPTIONS]
 
 REQUIRED:
-  --workspace <gid>       対象 workspace の GID
+  --workspace <gid|domain>  対象 workspace の GID、またはドメイン名（例 example.com）。
+                            ドメインのときは email_domains 照合で GID に解決（S-027）
   --from <email>          旧アカウントの email
   --to <email>            新アカウントの email
 
@@ -229,7 +230,7 @@ Re-run the same command to retry failed tasks (idempotent).
 | ID | 仕様 | 状態 | 関連要件 | 依存する仮説 | 採択基準 | 下位への制約 | 未決事項 |
 |---|---|---|---|---|---|---|---|
 | S-019 | CLI はサブコマンド制（`migrate` / `survey`）。サブコマンドは明示必須で、無指定/未知サブコマンドは exit 2。`-h`/`--help`・`-V`/`--version` は top-level。破壊的変更のため VERSION を 0.2.0 に上げる | 確定 | R16 | — | サブコマンド分岐が動く | bare 呼び出し（旧 migrate）は廃止 | per-subcommand help の粒度 |
-| S-020 | `survey` 引数: `--workspace <gid>`（必須・数値）/ `--domain <domain>`（必須）/ `--json` / `--verbose` / `--quiet`。domain 妥当性は「`@`・空白を含まず、少なくとも 1 つのドット区切りラベルを持つ」こと、lowercase 正規化、先頭 `@` は許容して除去 | 確定 | R16 | — | 不正値で exit 2 | migrate 専用フラグ（`--from`/`--to`/`--dry-run`/`--yes`）は survey では Unknown option | — |
+| S-020 | `survey` 引数: `--workspace <gid\|domain>`（必須。数値=GID、非数値=ドメインとして解決 [S-027]）/ `--domain <domain>`（必須。集計対象の **assignee** ドメイン。`--workspace` のドメインとは役割が異なる）/ `--json` / `--verbose` / `--quiet`。domain 妥当性は「`@`・空白を含まず、少なくとも 1 つのドット区切りラベルを持つ」こと、lowercase 正規化、先頭 `@` は許容して除去（`--workspace` のドメイン値にも同じ正規化を適用） | 確定 | R16, R24 | H-API8 | 不正値で exit 2 | migrate 専用フラグ（`--from`/`--to`/`--dry-run`/`--yes`）は survey では Unknown option | — |
 | S-021 | survey 実行フロー: pre-check（`getWorkspace`）→ 全ユーザー列挙 → domain フィルタ → 対象ごとに未完了タスク件数集計（per-account エラーは記録して継続）→ 件数降順でレンダリング | 確定 | R17, R18, R19, R23 | H-API7, H-API4 | 各ステップが順序通り実行 | — | — |
 | S-022 | survey API シーケンス: `getWorkspace` → `getUsers`（paginated）→ `getTasks({assignee, completed_since:"now"})` × 対象数。`updateTask` は呼ばない | 確定 | R18, R21 | H-API4, H-API7, H-DOM3 | 規定順序で API 発生、更新系を呼ばない | — | — |
 | S-023 | survey 出力: 人間可読では workspace / domain / 総ユーザー数 / 対象数 / email 非可視数の注記 / アカウント別（件数降順）/ サマリ。`--json` では構造化 JSON | 確定 | R19, R20, R22, R23 | — | サンプル出力と一致 | `--quiet` は per-account の件数内訳を省くが、errored account は summary 後に必ず列挙する（R23 継続+報告、migrate の R7 と整合） | — |
@@ -247,8 +248,10 @@ SUBCOMMANDS:
   survey     指定ドメインの未移行（未完了かつ当該ドメインが assignee）タスク件数を集計（読み取り専用）
 
 survey OPTIONS:
-  --workspace <gid>   対象 workspace の GID（必須）
-  --domain <domain>   集計対象ドメイン（必須、例 example.com）
+  --workspace <gid|domain>  対象 workspace の GID またはドメイン名（必須）。
+                            ドメインは email_domains 照合で GID 解決（S-027）
+  --domain <domain>   集計対象の assignee ドメイン（必須、例 example.com）。
+                      ↑ --workspace のドメイン（= org の特定）とは役割が別
   --json              出力を JSON 形式に切替
   --verbose           API リクエスト/レスポンス詳細を stderr に出力
   --quiet             アカウント別内訳を省略しサマリのみ
@@ -299,6 +302,36 @@ unmigrated incomplete tasks : 301
   ],
   "erroredAccounts": 0
 }
+```
+
+## workspace 指定のドメイン解決（2026-05-30 追加、S-027）
+
+migrate / survey 共通の `--workspace` 値解決ロジック。要件 [R24, R25](01_requirements.md)、判断 [29, 30](06_decisions.md)、制約 [C-014（緩和）, C-018](05_constraints.md)、仮説 [H-API8](02_hypotheses.md) を満たす。
+
+| ID | 仕様 | 状態 | 関連要件 | 依存する仮説 | 採択基準 | 下位への制約 | 未決事項 |
+|---|---|---|---|---|---|---|---|
+| S-027 | `--workspace` 値の解決: (1) `/^[0-9]+$/` に一致すれば GID 直指定として従来どおり扱う。(2) 一致しなければドメイン名とみなし、lowercase 正規化・先頭 `@` 除去（S-020 と同じ正規化）。(3) `workspacesApi.getWorkspaces({opt_fields:"gid,name,is_organization,email_domains"})` を取得し、`email_domains` に当該ドメインを含む workspace を選択。(4) 一意に解決できたらその GID で既存の `getWorkspace` pre-check に合流。0 件 / 複数件は exit 2 で、可視 workspace（GID・name・email_domains）を列挙して案内（R25）。解決は PAT 認証下で行う（追加トークン不要） | 確定 | R24, R25 | H-API8 | 数値=GID 直通 / ドメイン=一意解決 / 0・複数件で exit 2 + 列挙 | facade に `resolveWorkspace(input): Promise<{gid, name}>`（または `listWorkspaces()`）を追加。組織固有値はハードコードしない（C-016） | `email_domains` 非返却時の挙動（H-API8 棄却条件 → GID 必須へ戻す） |
+
+### 解決フロー（S-027）
+
+```
+--workspace の値 input
+  ├─ /^[0-9]+$/ に一致 → GID として getWorkspace(input) へ（従来パス、API 1 回節約）
+  └─ 非数値 → normalizeDomain(input)
+        → getWorkspaces(opt_fields=gid,name,is_organization,email_domains)
+        → email_domains.includes(domain) で絞り込み
+            ├─ 1 件 → その gid で getWorkspace 合流
+            ├─ 0 件 → exit 2「ドメイン <d> に一致する workspace が見つかりません」+ 可視 workspace 列挙
+            └─ 2 件以上 → exit 2「ドメイン <d> が複数 workspace に一致」+ 該当 workspace 列挙（GID 直指定を案内）
+```
+
+### エラーメッセージ例（R25 / S-027）
+
+```
+error: no workspace found for domain "example.com".
+  Visible workspaces (use --workspace <gid> directly):
+    1234567890  My Company        [example.com]
+    9876543210  Personal          (not an organization, no domain)
 ```
 
 ## 関連

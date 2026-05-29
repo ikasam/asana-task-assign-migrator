@@ -38,6 +38,95 @@ export class PreCheckError extends Error {
   }
 }
 
+const GID_RE = /^[0-9]+$/;
+
+// Resolves a --workspace value (GID or domain) to a Workspace. Shared by migrate
+// and survey pre-checks (S-027 / R24 / R25).
+//   - Numeric → direct getWorkspace (no listing call, the common path).
+//   - Otherwise → treat as a domain (already normalized by the CLI parser) and
+//     match against organizations' email_domains. 0 or >1 matches → PreCheckError
+//     (exit 2) listing visible workspaces so the user can fall back to a GID.
+export async function resolveWorkspace(
+  client: AsanaClient,
+  run: <T>(fn: () => Promise<T>) => Promise<T>,
+  input: string,
+): Promise<Workspace> {
+  if (GID_RE.test(input)) {
+    try {
+      return await run(() => client.getWorkspace(input));
+    } catch (e) {
+      throw workspaceLookupError(`workspace not found or no access (gid=${input})`, e);
+    }
+  }
+
+  const domain = input; // CLI parser already lowercased / stripped a leading '@'
+  let workspaces: Workspace[];
+  try {
+    workspaces = await run(() => client.listWorkspaces());
+  } catch (e) {
+    throw workspaceLookupError(
+      `failed to list workspaces while resolving domain "${domain}"`,
+      e,
+    );
+  }
+
+  const matches = workspaces.filter((w) => (w.emailDomains ?? []).includes(domain));
+  if (matches.length === 1) {
+    // Re-fetch via getWorkspace so the domain path gets the same canonical
+    // access/404 validation as the numeric-GID path (S-027: "getWorkspace
+    // pre-check に合流").
+    try {
+      return await run(() => client.getWorkspace(matches[0].gid));
+    } catch (e) {
+      throw workspaceLookupError(
+        `workspace not found or no access ` +
+          `(gid=${matches[0].gid}, resolved from domain "${domain}")`,
+        e,
+      );
+    }
+  }
+  if (matches.length === 0) {
+    throw new PreCheckError(
+      `no workspace found for domain "${domain}".`,
+      workspaceListHint(workspaces, "Visible workspaces (use --workspace <gid> directly):"),
+    );
+  }
+  throw new PreCheckError(
+    `domain "${domain}" matches multiple workspaces.`,
+    workspaceListHint(matches, "Matching workspaces (use --workspace <gid> directly):"),
+  );
+}
+
+function workspaceLookupError(message: string, e: unknown): PreCheckError {
+  const err = normalizeError(e);
+  return new PreCheckError(
+    message,
+    err.httpStatus === 401
+      ? "ASANA_ACCESS_TOKEN may be invalid or revoked."
+      : `Asana API: HTTP ${err.httpStatus} ${err.code}`,
+  );
+}
+
+function workspaceListHint(workspaces: Workspace[], header: string): string {
+  if (workspaces.length === 0) {
+    return "No workspaces are visible to this token.";
+  }
+  const lines = workspaces.map((w) => {
+    const domains = w.emailDomains ?? [];
+    let tag: string;
+    if (domains.length > 0) {
+      tag = `[${domains.join(", ")}]`;
+    } else if (w.isOrganization === false) {
+      tag = "(not an organization, no domain)";
+    } else {
+      // Organization (or unknown) but no email domains visible to this PAT (C-018).
+      tag = "(organization; no email domains visible to this token)";
+    }
+    return `  ${w.gid}  ${w.name}  ${tag}`;
+  });
+  return header + "\n" + lines.join("\n");
+}
+
 export interface RunMigrationOpts {
   args: CliArgs;
   client: AsanaClient;
@@ -55,7 +144,7 @@ export async function runMigration(opts: RunMigrationOpts): Promise<ExitCode> {
   });
 
   // [Pre-checks]
-  const workspace = await preCheckWorkspace(client, run, args.workspace);
+  const workspace = await resolveWorkspace(client, run, args.workspace);
   const fromUser = await preCheckUser(client, run, args.from, "from");
   const toUser = await preCheckUser(client, run, args.to, "to");
   await preCheckMembership(client, run, workspace.gid, toUser);
@@ -133,24 +222,6 @@ export async function runMigration(opts: RunMigrationOpts): Promise<ExitCode> {
   }
 
   return summary.failed > 0 ? 1 : 0;
-}
-
-async function preCheckWorkspace(
-  client: AsanaClient,
-  run: <T>(fn: () => Promise<T>) => Promise<T>,
-  gid: string,
-): Promise<Workspace> {
-  try {
-    return await run(() => client.getWorkspace(gid));
-  } catch (e) {
-    const err = normalizeError(e);
-    throw new PreCheckError(
-      `workspace not found or no access (gid=${gid})`,
-      err.httpStatus === 401
-        ? "ASANA_ACCESS_TOKEN may be invalid or revoked."
-        : `Asana API: HTTP ${err.httpStatus} ${err.code}`,
-    );
-  }
 }
 
 async function preCheckUser(

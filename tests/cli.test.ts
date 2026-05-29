@@ -72,12 +72,42 @@ Deno.test("migrate: missing required throws", () => {
   );
 });
 
-Deno.test("migrate: workspace must be numeric", () => {
+Deno.test("migrate: workspace rejects non-gid non-domain", () => {
+  // "abc" is neither a numeric GID nor a valid domain (no dot) → rejected.
   assertThrows(
     () => parseArgs(["migrate", "--workspace", "abc", "--from", "a@b.c", "--to", "c@d.e"]),
     CliUsageError,
     "Invalid --workspace",
   );
+});
+
+Deno.test("migrate: workspace accepts a domain (normalized)", () => {
+  const r = parseArgs([
+    "migrate",
+    "--workspace",
+    "@Example.COM",
+    "--from",
+    "a@example.com",
+    "--to",
+    "b@example.com",
+  ]);
+  if (r.kind !== "migrate") throw new Error("expected migrate");
+  // Lowercased + leading '@' stripped; GID resolution happens later via the API.
+  assertEquals(r.args.workspace, "example.com");
+});
+
+Deno.test("migrate: workspace keeps a numeric gid as-is", () => {
+  const r = parseArgs([
+    "migrate",
+    "--workspace",
+    "1234567890",
+    "--from",
+    "a@example.com",
+    "--to",
+    "b@example.com",
+  ]);
+  if (r.kind !== "migrate") throw new Error("expected migrate");
+  assertEquals(r.args.workspace, "1234567890");
 });
 
 Deno.test("migrate: email format enforced", () => {
@@ -158,12 +188,20 @@ Deno.test("survey: missing required throws", () => {
   );
 });
 
-Deno.test("survey: workspace must be numeric", () => {
+Deno.test("survey: workspace rejects non-gid non-domain", () => {
   assertThrows(
     () => parseArgs(["survey", "--workspace", "abc", "--domain", "example.com"]),
     CliUsageError,
     "Invalid --workspace",
   );
+});
+
+Deno.test("survey: workspace accepts a domain (normalized)", () => {
+  const r = parseArgs(["survey", "--workspace", "Corp.EXAMPLE", "--domain", "example.com"]);
+  if (r.kind !== "survey") throw new Error("expected survey");
+  assertEquals(r.args.workspace, "corp.example");
+  // The survey --domain stays independent of the --workspace domain.
+  assertEquals(r.args.domain, "example.com");
 });
 
 Deno.test("survey: invalid domain rejected", () => {

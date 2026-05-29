@@ -214,6 +214,23 @@
 - **理由**: 既存 migrate（`--json` 対応）と一貫。手動確認と機械処理の両対応。`--quiet` で内訳省略、`--verbose` で API debug。
 - **関連**: R22, [S-023](03_specifications.md)
 
+## 判断 29: workspace をドメイン名で指定する入口（2026-05-30）
+
+- **背景**: GID を手で調べて入力する UX が悪い（W-009）。これは [C-014「`--workspace` は GID 必須」](05_constraints.md) の再検討トリガー「UX 改善ニーズが具体化した場合」に該当する正当な再オープン。なお既存 `--domain` は survey で「assignee の email ドメイン」を意味する別フラグで、命名衝突の解消が論点。
+- **選択肢**: A `--workspace` を拡張（数値=GID / 非数値=ドメインの auto-detect、新フラグ無し） / B 新フラグ `--workspace-domain <domain>`（`--workspace <gid>` と排他） / C 値プレフィックス（`gid:` / `domain:`）方式
+- **採択**: **A**
+- **理由**: 新フラグを増やさず、既存の GID 指定と完全後方互換。要望（GID を調べさせない）を最小コストで満たす。GID は `/^[0-9]+$/`、ドメインは少なくとも 1 つのドット区切りラベルを持つ形なので auto-detect の曖昧性は無い。survey でも `--workspace`（解決対象）と assignee 用 `--domain` は別フラグなので役割は分離できる（help 文で明記）。
+- **「ドメイン名」の意味**: workspace の**表示名**ではなく、organization の登録 email ドメイン（workspace オブジェクトの `email_domains`）。表示名での指定は**同名 workspace の曖昧性**のため引き続き非対応（README 制限事項を踏襲）。素の workspace（`is_organization=false`、ドメイン無し）には適用できず GID 指定が必要 → [C-018](05_constraints.md)。
+- **関連**: W-009, D-018, R24, R25, [C-014（緩和）, C-018](05_constraints.md), [H-API8](02_hypotheses.md), [S-027](03_specifications.md)
+
+## 判断 30: ドメイン解決の適用範囲（2026-05-30）
+
+- **選択肢**: A migrate と survey の両方 / B migrate のみ（survey は GID 維持）
+- **採択**: **A**
+- **理由**: 解決ロジック（`GET /workspaces` + `email_domains` 照合）を facade に一本化し、両サブコマンドで挙動を一貫させる。survey は `--workspace`（org をドメインで特定）と `--domain`（集計対象の assignee ドメイン）が併存するため、help 文で役割の違いを明記する。
+- **後方互換**: 既存の GID 指定（migrate / survey とも）はそのまま通る。破壊的変更なし。
+- **関連**: R24, [S-020, S-027](03_specifications.md)
+
 ---
 
 ## 棄却された案の整理（再検討トリガー付き）
@@ -236,6 +253,7 @@
 | survey: CSV / ファイル出力 | 判断 28 | stdout / `--json` リダイレクトでは不足との運用要望 |
 | survey: email 個別再解決 | 判断 27 | email 欠落が集計を無意味にするほど多いと判明 |
 | bare 呼び出し（サブコマンド省略）の維持 | 判断 26 | 既存利用者の移行コストが破壊コストを上回ると判明 |
+| workspace 表示名での指定 | 判断 29（ドメイン指定は採択、表示名は非対応のまま） | 同名 workspace を曖昧性なく区別する手段が確立したら |
 
 ## 関連
 
