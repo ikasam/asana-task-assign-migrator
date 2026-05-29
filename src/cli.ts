@@ -104,12 +104,7 @@ function parseMigrate(argv: readonly string[]): ParseResult {
   if (!from) throw new CliUsageError("Missing required option: --from");
   if (!to) throw new CliUsageError("Missing required option: --to");
 
-  if (!GID_RE.test(workspace)) {
-    throw new CliUsageError(
-      `Invalid --workspace value: ${workspace}`,
-      "Expected a numeric GID. Find it in the Asana URL: /0/<gid>/...",
-    );
-  }
+  workspace = validateWorkspace(workspace);
   if (!EMAIL_RE.test(from)) {
     throw new CliUsageError(`Invalid --from value: ${from}`, "Expected an email address.");
   }
@@ -164,12 +159,7 @@ function parseSurvey(argv: readonly string[]): ParseResult {
   if (!workspace) throw new CliUsageError("Missing required option: --workspace");
   if (!domain) throw new CliUsageError("Missing required option: --domain");
 
-  if (!GID_RE.test(workspace)) {
-    throw new CliUsageError(
-      `Invalid --workspace value: ${workspace}`,
-      "Expected a numeric GID. Find it in the Asana URL: /0/<gid>/...",
-    );
-  }
+  workspace = validateWorkspace(workspace);
 
   const normalized = normalizeDomain(domain);
   if (!isValidDomain(normalized)) {
@@ -183,6 +173,20 @@ function parseSurvey(argv: readonly string[]): ParseResult {
     kind: "survey",
     args: { workspace, domain: normalized, json, verbose, quiet },
   };
+}
+
+// Validates and normalizes a --workspace value (S-027 / R24). A numeric GID passes
+// through unchanged; otherwise the value must be a domain (lowercased, leading '@'
+// stripped) which the orchestrator later resolves to a GID via the API. The GID is
+// disambiguated from a domain purely by /^[0-9]+$/ — domains always carry a dot.
+function validateWorkspace(raw: string): string {
+  if (GID_RE.test(raw)) return raw;
+  const normalized = normalizeDomain(raw);
+  if (isValidDomain(normalized)) return normalized;
+  throw new CliUsageError(
+    `Invalid --workspace value: ${raw}`,
+    "Expected a numeric GID (Asana URL /0/<gid>/...) or a domain like example.com.",
+  );
 }
 
 // Lowercase and drop a leading '@' so both "example.com" and "@example.com" work.
@@ -246,7 +250,8 @@ USAGE:
   asana-task-assign-migrator migrate [OPTIONS]
 
 REQUIRED:
-  --workspace <gid>          target workspace GID
+  --workspace <gid|domain>   target workspace: a numeric GID, or a domain
+                             (e.g. example.com) resolved to its organization
   --from <email>             old account email
   --to <email>               new account email
 
@@ -268,8 +273,10 @@ USAGE:
   asana-task-assign-migrator survey [OPTIONS]
 
 REQUIRED:
-  --workspace <gid>          target workspace GID
-  --domain <domain>          email domain to survey (e.g. example.com)
+  --workspace <gid|domain>   target workspace: a numeric GID, or a domain
+                             (e.g. example.com) resolved to its organization
+  --domain <domain>          assignee email domain to survey (e.g. example.com)
+                             — this is the accounts to count, not the workspace
 
 OPTIONS:
   --json                     emit JSON output

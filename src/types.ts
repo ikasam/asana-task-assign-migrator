@@ -17,6 +17,11 @@ export interface CliArgs {
 export interface Workspace {
   gid: string;
   name: string;
+  // Populated only by listWorkspaces (for --workspace domain resolution, S-027).
+  // An organization carries its registered email domains here; a plain workspace
+  // has isOrganization=false and no domains. getWorkspace leaves these undefined.
+  isOrganization?: boolean;
+  emailDomains?: string[];
 }
 
 export interface User {

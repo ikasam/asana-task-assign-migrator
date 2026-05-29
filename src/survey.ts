@@ -15,20 +15,14 @@
 
 import type { AsanaClient } from "./asana_client.ts";
 import { normalizeError } from "./asana_client.ts";
-import { PreCheckError } from "./migrator.ts";
+import { resolveWorkspace } from "./migrator.ts";
 import {
   createThrottledRunner,
   defaultRateLimitDetector,
   defaultRetryAfterExtractor,
 } from "./rate_limiter.ts";
 import { renderSurvey, stdWriter, type Writer } from "./output.ts";
-import type {
-  ExitCode,
-  SurveyAccountResult,
-  SurveyArgs,
-  SurveyPayload,
-  Workspace,
-} from "./types.ts";
+import type { ExitCode, SurveyAccountResult, SurveyArgs, SurveyPayload } from "./types.ts";
 
 export interface RunSurveyOpts {
   args: SurveyArgs;
@@ -46,8 +40,9 @@ export async function runSurvey(opts: RunSurveyOpts): Promise<ExitCode> {
     extractRetryAfterSec: defaultRetryAfterExtractor,
   });
 
-  // [Pre-check] workspace
-  const workspace = await preCheckWorkspace(client, run, args.workspace);
+  // [Pre-check] workspace — resolves a GID or domain (S-027), throws PreCheckError
+  // (→ exit 2 in main.ts) on lookup failure / unresolvable domain.
+  const workspace = await resolveWorkspace(client, run, args.workspace);
 
   // [List users] + [domain filter] (R17)
   const allUsers = await run(() => client.listWorkspaceUsers(args.workspace));
@@ -103,24 +98,6 @@ export async function runSurvey(opts: RunSurveyOpts): Promise<ExitCode> {
   renderSurvey(args, payload, writer);
 
   // exit 1 if any account errored, else 0 (S-024). Pre-check failures throw
-  // PreCheckError above and are mapped to exit 2 by main.ts.
+  // PreCheckError in resolveWorkspace and are mapped to exit 2 by main.ts.
   return erroredAccounts > 0 ? 1 : 0;
-}
-
-async function preCheckWorkspace(
-  client: AsanaClient,
-  run: <T>(fn: () => Promise<T>) => Promise<T>,
-  gid: string,
-): Promise<Workspace> {
-  try {
-    return await run(() => client.getWorkspace(gid));
-  } catch (e) {
-    const err = normalizeError(e);
-    throw new PreCheckError(
-      `workspace not found or no access (gid=${gid})`,
-      err.httpStatus === 401
-        ? "ASANA_ACCESS_TOKEN may be invalid or revoked."
-        : `Asana API: HTTP ${err.httpStatus} ${err.code}`,
-    );
-  }
 }
