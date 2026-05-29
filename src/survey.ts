@@ -44,8 +44,9 @@ export async function runSurvey(opts: RunSurveyOpts): Promise<ExitCode> {
   // (→ exit 2 in main.ts) on lookup failure / unresolvable domain.
   const workspace = await resolveWorkspace(client, run, args.workspace);
 
-  // [List users] + [domain filter] (R17)
-  const allUsers = await run(() => client.listWorkspaceUsers(args.workspace));
+  // [List users] + [domain filter] (R17). Use the resolved GID (workspace.gid),
+  // not args.workspace which may be a domain string after S-027 resolution.
+  const allUsers = await run(() => client.listWorkspaceUsers(workspace.gid));
   const suffix = "@" + args.domain;
   const matched = allUsers.filter((u) => u.email !== "" && u.email.endsWith(suffix));
   const emailInvisibleUsers = allUsers.filter((u) => u.email === "").length;
@@ -54,7 +55,7 @@ export async function runSurvey(opts: RunSurveyOpts): Promise<ExitCode> {
   const accounts: SurveyAccountResult[] = [];
   for (const u of matched) {
     try {
-      const tasks = await run(() => client.listAssignedIncompleteTasks(args.workspace, u.gid));
+      const tasks = await run(() => client.listAssignedIncompleteTasks(workspace.gid, u.gid));
       // Only retain per-task detail when --json needs it; otherwise keep just the
       // count so large workspaces don't hold every task across all accounts.
       accounts.push({
