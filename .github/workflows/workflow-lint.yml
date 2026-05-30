@@ -27,19 +27,21 @@ jobs:
   actionlint-pinact:
     name: actionlint / pinact
     runs-on: ubuntu-latest
-    # mise-action のツール取得 (GitHub releases) と pinact --verify の API 呼び出しで
-    # レート制限を避けるため read-only token を渡す。
-    env:
-      GITHUB_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      # mise.toml で固定した actionlint / pinact を導入する (ローカルと同一バージョン)。
+      # mise.toml で固定した actionlint / pinact / shellcheck を導入する。
+      # token は mise の GitHub releases 取得用にこのステップだけへ絞る。
       - uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
 
+      # actionlint はトークン不要なので env を付けない (露出を最小化)。
       - name: actionlint
         run: mise run actions:lint
 
-      # 全 Action が SHA pin 済みかつバージョンコメントが SHA と一致するか検証する。
+      # pinact --verify は GitHub API を叩くため、このステップにだけ token を渡す。
       - name: pinact (verify SHA pins)
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: mise run actions:check

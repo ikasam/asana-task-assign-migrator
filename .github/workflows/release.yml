@@ -18,9 +18,6 @@ jobs:
   build:
     name: Build ${{ matrix.target }}
     runs-on: ubuntu-latest
-    # mise-action が deno を GitHub releases から取得する際のレート制限回避用 token。
-    env:
-      GITHUB_TOKEN: ${{ github.token }}
     strategy:
       # 1 ターゲットが失敗しても他のビルドは続行する。
       fail-fast: false
@@ -36,7 +33,10 @@ jobs:
 
       # mise.toml で固定した deno (= CI test / ローカルと同一バージョン) を導入する。
       # リリースバイナリも暗黙の最新 deno でビルドしない。
+      # token は mise の GitHub releases 取得用にこのステップだけへ絞る。
       - uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
 
       - name: Install dependencies (verify frozen lockfile)
         run: deno install --frozen
