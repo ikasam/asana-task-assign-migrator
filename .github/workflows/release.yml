@@ -18,6 +18,9 @@ jobs:
   build:
     name: Build ${{ matrix.target }}
     runs-on: ubuntu-latest
+    # mise-action が deno を GitHub releases から取得する際のレート制限回避用 token。
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
     strategy:
       # 1 ターゲットが失敗しても他のビルドは続行する。
       fail-fast: false
@@ -31,10 +34,9 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - uses: denoland/setup-deno@667a34cdef165d8d2b2e98dde39547c9daac7282 # v2.0.4
-        with:
-          deno-version: v2.x
-          cache: true
+      # mise.toml で固定した deno (= CI test / ローカルと同一バージョン) を導入する。
+      # リリースバイナリも暗黙の最新 deno でビルドしない。
+      - uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
 
       - name: Install dependencies (verify frozen lockfile)
         run: deno install --frozen

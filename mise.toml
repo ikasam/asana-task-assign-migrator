@@ -1,8 +1,10 @@
 # ローカル / CI 共通のツールチェーン。
-# `mise install` で actionlint / pinact を導入し、`mise run <task>` で実行する。
-# (deno はプロジェクトのランタイムだが、既存環境を尊重して mise 管理下に置かない)
+# `mise install` で deno / actionlint / pinact / shellcheck を同一バージョンで導入する。
+# CI も jdx/mise-action でこの mise.toml を読み込むため、ローカルと CI のツール
+# バージョンが常に一致する (暗黙の「最新」を使わない = 挙動差とサプライチェーンリスクの低減)。
 
 [tools]
+deno = "2.5.6"        # プロジェクトのランタイム。ローカル / CI で同一バージョンに固定
 actionlint = "1.7.12" # GitHub Actions ワークフローの静的検査
 pinact = "4.0.0"      # GitHub Actions をコミット SHA に pin / 検証
 # actionlint は PATH 上に shellcheck があれば run: スクリプトを shellcheck に渡す。
