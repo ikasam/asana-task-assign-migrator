@@ -1,0 +1,87 @@
+name: Release
+
+# `vX.Y.Z` タグの push で各 OS 向け単一バイナリを deno compile し、
+# GitHub Releases に添付する。クロスコンパイルは検証済みのため全ターゲットを
+# 単一の ubuntu runner からビルドする (ネイティブ runner マトリクス不要)。
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+env:
+  BIN_NAME: asana-task-assign-migrator
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    strategy:
+      # 1 ターゲットが失敗しても他のビルドは続行する。
+      fail-fast: false
+      matrix:
+        target:
+          - x86_64-unknown-linux-gnu
+          - aarch64-unknown-linux-gnu
+          - x86_64-apple-darwin
+          - aarch64-apple-darwin
+          - x86_64-pc-windows-msvc
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+          cache: true
+
+      - name: Install dependencies (verify frozen lockfile)
+        run: deno install --frozen
+
+      # windows-msvc ターゲットでは deno compile が出力名に .exe を自動付与する。
+      - name: Compile
+        run: |
+          deno compile \
+            --target ${{ matrix.target }} \
+            --allow-net=app.asana.com \
+            --allow-env=ASANA_ACCESS_TOKEN \
+            --allow-read \
+            --output "dist/${BIN_NAME}-${{ matrix.target }}" \
+            src/main.ts
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: binary-${{ matrix.target }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 1
+
+  release:
+    name: Publish release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      # Releases の作成とアセットのアップロードに必要。
+      contents: write
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Generate checksums
+        working-directory: dist
+        run: sha256sum ${BIN_NAME}-* > SHA256SUMS.txt
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            --repo "${{ github.repository }}" \
+            --title "${{ github.ref_name }}" \
+            --generate-notes \
+            --verify-tag \
+            dist/*

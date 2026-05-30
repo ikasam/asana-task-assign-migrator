@@ -1,0 +1,82 @@
+name: CI
+
+# 品質ゲート: push (main) と全 PR で fmt / lint / 型チェック / テストを実行し、
+# C7 (deno compile 互換性) のリグレッションを compile-smoke ジョブで継続的に監視する。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# 同一 ref で新しい push が来たら進行中のランをキャンセルして無駄を省く。
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: fmt / lint / check / test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v2
+        with:
+          # ローカル開発と揃え、2.x の最新 stable に追従する。
+          deno-version: v2.x
+          # DENO_DIR を deno.lock のハッシュをキーにキャッシュする。
+          cache: true
+
+      # 依存を事前に取得しつつ deno.lock の整合性を検証する。
+      # `--frozen` は lockfile が古い (deno.json と不整合) 場合に失敗する。
+      # また tests/sdk_load.test.ts は npm:asana を `--allow-net` 無しの
+      # サブプロセスで import するため、ここでキャッシュを温めておかないと
+      # オフラインで解決できずに失敗する。
+      - name: Install dependencies (verify frozen lockfile)
+        run: deno install --frozen
+
+      - name: Format check
+        run: deno task fmt:check
+
+      - name: Lint
+        run: deno task lint
+
+      - name: Type check
+        run: deno task check
+
+      - name: Test
+        run: deno task test
+
+  compile-smoke:
+    name: compile smoke (C7 guard)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+          cache: true
+
+      - name: Install dependencies (verify frozen lockfile)
+        run: deno install --frozen
+
+      # asana SDK は CommonJS + superagent (Node http 依存) のため、
+      # deno compile が壊れていないかを毎 PR で安価に検証する
+      # (release.yml が初めての compile 失敗発見場所にならないようにする)。
+      - name: Compile (native target)
+        run: |
+          deno compile \
+            --allow-net=app.asana.com \
+            --allow-env=ASANA_ACCESS_TOKEN \
+            --allow-read \
+            --output dist/asana-task-assign-migrator \
+            src/main.ts
+
+      - name: Smoke-run the compiled binary
+        run: |
+          ./dist/asana-task-assign-migrator --version
+          ./dist/asana-task-assign-migrator --help > /dev/null

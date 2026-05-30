@@ -674,8 +674,6 @@
   "workspace": {
     "dependencies": [
       "jsr:@std/assert@1",
-      "jsr:@std/cli@1",
-      "jsr:@std/fmt@1",
       "npm:asana@3.1.11"
     ]
   }
