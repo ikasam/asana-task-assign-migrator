@@ -2,6 +2,8 @@ name: CI
 
 # 品質ゲート: push (main) と全 PR で fmt / lint / 型チェック / テストを実行し、
 # C7 (deno compile 互換性) のリグレッションを compile-smoke ジョブで継続的に監視する。
+# さらに actions-lint ジョブで actionlint / pinact を実行し、ワークフロー自身の
+# 静的検査と「全 Action が SHA pin 済みか」の検証を行う (ローカルと同じ mise 経由)。
 
 on:
   push:
@@ -80,3 +82,23 @@ jobs:
         run: |
           ./dist/asana-task-assign-migrator --version
           ./dist/asana-task-assign-migrator --help > /dev/null
+
+  actions-lint:
+    name: actionlint / pinact
+    runs-on: ubuntu-latest
+    # mise-action のツール取得 (GitHub releases) と pinact --verify の API 呼び出しで
+    # レート制限を避けるため read-only token を渡す。
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      # mise.toml で固定した actionlint / pinact を導入する (ローカルと同一バージョン)。
+      - uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
+
+      - name: actionlint
+        run: mise run actions:lint
+
+      # 全 Action が SHA pin 済みかつバージョンコメントが SHA と一致するか検証する。
+      - name: pinact (verify SHA pins)
+        run: mise run actions:check

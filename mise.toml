@@ -1,0 +1,19 @@
+# ローカル / CI 共通のツールチェーン。
+# `mise install` で actionlint / pinact を導入し、`mise run <task>` で実行する。
+# (deno はプロジェクトのランタイムだが、既存環境を尊重して mise 管理下に置かない)
+
+[tools]
+actionlint = "1.7.12" # GitHub Actions ワークフローの静的検査
+pinact = "4.0.0"      # GitHub Actions をコミット SHA に pin / 検証
+
+[tasks."actions:lint"]
+description = "actionlint で GitHub Actions ワークフローを静的検査する"
+run = "actionlint"
+
+[tasks."actions:pin"]
+description = "pinact で GitHub Actions をコミット SHA に pin する (ワークフローを修正)"
+run = "pinact run"
+
+[tasks."actions:check"]
+description = "全 Action が SHA pin 済みかつバージョンコメントが SHA と一致するか検証する (CI と同じゲート)"
+run = "pinact run --check --verify"
