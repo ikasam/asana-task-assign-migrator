@@ -1,0 +1,89 @@
+name: Release
+
+# `vX.Y.Z` タグの push で各 OS 向け単一バイナリを deno compile し、
+# GitHub Releases に添付する。クロスコンパイルは検証済みのため全ターゲットを
+# 単一の ubuntu runner からビルドする (ネイティブ runner マトリクス不要)。
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+env:
+  BIN_NAME: asana-task-assign-migrator
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    strategy:
+      # 1 ターゲットが失敗しても他のビルドは続行する。
+      fail-fast: false
+      matrix:
+        target:
+          - x86_64-unknown-linux-gnu
+          - aarch64-unknown-linux-gnu
+          - x86_64-apple-darwin
+          - aarch64-apple-darwin
+          - x86_64-pc-windows-msvc
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      # mise.toml で固定した deno (= CI test / ローカルと同一バージョン) を導入する。
+      # リリースバイナリも暗黙の最新 deno でビルドしない。
+      # token は mise の GitHub releases 取得用にこのステップだけへ絞る。
+      - uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Install dependencies (verify frozen lockfile)
+        run: deno install --frozen
+
+      # windows-msvc ターゲットでは deno compile が出力名に .exe を自動付与する。
+      - name: Compile
+        run: |
+          deno compile \
+            --target ${{ matrix.target }} \
+            --allow-net=app.asana.com \
+            --allow-env=ASANA_ACCESS_TOKEN \
+            --allow-read \
+            --output "dist/${BIN_NAME}-${{ matrix.target }}" \
+            src/main.ts
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: binary-${{ matrix.target }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 1
+
+  release:
+    name: Publish release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      # Releases の作成とアセットのアップロードに必要。
+      contents: write
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Generate checksums
+        working-directory: dist
+        run: sha256sum "${BIN_NAME}"-* > SHA256SUMS.txt
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            --repo "${{ github.repository }}" \
+            --title "${{ github.ref_name }}" \
+            --generate-notes \
+            --verify-tag \
+            dist/*

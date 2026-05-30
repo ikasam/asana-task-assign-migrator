@@ -1,0 +1,25 @@
+# ローカル / CI 共通のツールチェーン。
+# `mise install` で deno / actionlint / pinact / shellcheck を同一バージョンで導入する。
+# CI も jdx/mise-action でこの mise.toml を読み込むため、ローカルと CI のツール
+# バージョンが常に一致する (暗黙の「最新」を使わない = 挙動差とサプライチェーンリスクの低減)。
+
+[tools]
+deno = "2.5.6"        # プロジェクトのランタイム。ローカル / CI で同一バージョンに固定
+actionlint = "1.7.12" # GitHub Actions ワークフローの静的検査
+pinact = "4.0.0"      # GitHub Actions をコミット SHA に pin / 検証
+# actionlint は PATH 上に shellcheck があれば run: スクリプトを shellcheck に渡す。
+# CI runner には shellcheck がプリインストールされているため、ローカルでも同じ検査を
+# 効かせる (= 同等の指摘を得る) ために明示的に固定する。
+shellcheck = "0.11.0"
+
+[tasks."actions:lint"]
+description = "actionlint で GitHub Actions ワークフローを静的検査する"
+run = "actionlint"
+
+[tasks."actions:pin"]
+description = "pinact で GitHub Actions をコミット SHA に pin する (ワークフローを修正)"
+run = "pinact run"
+
+[tasks."actions:check"]
+description = "全 Action が SHA pin 済みかつバージョンコメントが SHA と一致するか検証する (CI と同じゲート)"
+run = "pinact run --check --verify"
