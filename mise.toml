@@ -5,6 +5,10 @@
 [tools]
 actionlint = "1.7.12" # GitHub Actions ワークフローの静的検査
 pinact = "4.0.0"      # GitHub Actions をコミット SHA に pin / 検証
+# actionlint は PATH 上に shellcheck があれば run: スクリプトを shellcheck に渡す。
+# CI runner には shellcheck がプリインストールされているため、ローカルでも同じ検査を
+# 効かせる (= 同等の指摘を得る) ために明示的に固定する。
+shellcheck = "0.11.0"
 
 [tasks."actions:lint"]
 description = "actionlint で GitHub Actions ワークフローを静的検査する"
