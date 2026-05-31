@@ -1,6 +1,6 @@
 {
   "name": "@ikasam/asana-task-assign-migrator",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "exports": "./src/main.ts",
   "tasks": {
     "migrate": "deno run --allow-net=app.asana.com --allow-env=ASANA_ACCESS_TOKEN --allow-read src/main.ts migrate",
