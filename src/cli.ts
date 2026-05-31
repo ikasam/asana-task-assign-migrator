@@ -11,8 +11,9 @@
 //   - No I/O side effects; main.ts is responsible for stdout/stderr writes.
 
 import type { CliArgs, SurveyArgs } from "./types.ts";
+import denoJson from "../deno.json" with { type: "json" };
 
-export const VERSION = "0.2.0";
+export const VERSION = denoJson.version;
 
 export class CliUsageError extends Error {
   constructor(message: string, public hint?: string) {
