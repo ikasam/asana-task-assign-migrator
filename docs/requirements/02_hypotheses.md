@@ -22,7 +22,7 @@
 | H-VAL2 | 価値 | 移行残量をドメイン単位で可視化できると、移行の進捗把握・完了判断・優先順位付けに役立つ | survey 機能の動機（W-008） | 仮置き | 実利用フィードバック | 移行運用で「残りどれだけか」を即答できる | 残量把握が一度きりで継続価値が無いと判明 | ikasam |
 | H-API7 | 実装 | `usersApi.getUsers({workspace, opt_fields})` で workspace 全ユーザーを email 付きで列挙できる（標準ページネーション） | SDK 型定義 + 実機検証 | 採択（補強） | 2026-05-29 実機検証: 714 ユーザーを列挙。ただし 97 ユーザーは email を返さず（PAT 可視性制約 → C-017） | 全ユーザーを列挙でき、大半で email 取得可 | email が全く取れない / ページネーションが破綻 | — |
 | H-API8 | 実装 | `workspacesApi.getWorkspaces({opt_fields:"gid,name,is_organization,email_domains"})` が当該 PAT に対し organization の `email_domains` を返し、ドメイン照合で workspace を一意特定できる | Asana 公式 doc（`is_organization` は確認済、organization は会社を表す特別な workspace）+ 実機検証 | 採択 | 2026-05-30 実機検証: `listWorkspaces` が複数の organization を返し**いずれも `email_domains` 非空**、指定ドメインが正しい単一 gid に解決（`resolveWorkspace` で PASS）。別ドメインの兄弟 org とも誤マッチせず一意。本検証 PAT では C-018 の email_domains 非返却は発生せず | 指定ドメインで workspace を一意特定できる | `email_domains` が返らない（C-017 同様の可視性欠落）/ 同一ドメインが複数 workspace に跨る（**後者は実機未到達**: 検証環境では org ごとに domain が distinct で、兄弟 org が接頭辞付きの別ドメインを持っていても別 domain として衝突せず一意解決。Asana が PAT 可視範囲で domain 一意を保つなら R25 の multi-match 分岐は dead path の可能性 — 防御的に維持） | 実機 |
-| H-DENO4 | 実装 | `import cfg from "../deno.json" with { type: "json" }` で得た version が `deno compile` の単一バイナリに同梱され、ランタイムの `--version` に反映される | Deno の static import は compile 対象に含まれる（JSON import 含む） | 要検証 | リリース自動化の実装時に 1 回 compile して `./dist/asana-task-assign-migrator --version` が deno.json の version と一致するか観測 | バイナリの `--version` 出力が deno.json の version と一致 | 同梱されない / 実行時に解決エラー → build 時に version 定数を生成する codegen にフォールバック（single source = deno.json は維持） | 実機 |
+| H-DENO4 | 実装 | `import cfg from "../deno.json" with { type: "json" }` で得た version が `deno compile` の単一バイナリに同梱され、ランタイムの `--version` に反映される | Deno の static import は compile 対象に含まれる（JSON import 含む）+ 実機検証 | 採択 | 2026-05-31 実機検証: deno 2.5.6 で compile したネイティブバイナリの `--version` が `asana-task-assign-migrator 0.2.0` を出力し deno.json (0.2.0) と一致。cli.ts は `import denoJson from "../deno.json" with { type: "json" }` で導出し、check/lint/fmt/test 45 pass | バイナリの `--version` 出力が deno.json の version と一致 | 同梱されない / 実行時に解決エラー → build 時に version 定数を生成する codegen にフォールバック（single source = deno.json は維持） | 実機 |
 
 ## 仮説検証計画
 
@@ -37,7 +37,7 @@
 | H-INT1 | 利用フェーズ | プロンプト承認率 / `--yes` 使用率 | 利用者ヒアリング | UX 維持 | プロンプト省略やデフォルト動作を見直し | 判断 19e 再検討 |
 | H-API7 | survey 実装時 | `getUsers` の email 返却率 | 列挙ユーザー数 / email 欠落数 | R20 の注記文言を確定 | email 欠落が多すぎる場合は別手段（`getUserForWorkspace` 個別）を検討 | 判断 27 を再開 |
 | H-API8 | ドメイン解決の実装フェーズ初期（2026-05-30 採択済） | `GET /workspaces?opt_fields=gid,name,is_organization,email_domains` の返却内容 | 各 workspace の `is_organization` / `email_domains` | R24 のドメイン解決ロジックを確定（実機 PASS で確定済） | `email_domains` が返らなければドメイン解決を断念し GID 必須へ戻す（C-014 を維持）。複数一致なら R25 の列挙で人手に委ねる | 判断 29 を再開 |
-| H-DENO4 | リリース自動化の実装フェーズ初期 | `deno compile` 後のバイナリの `--version` 出力 | バイナリ出力 vs deno.json の version | S-031 を確定（cli.ts の JSON import 採用） | build 時に version 定数を生成する codegen へ切替 | 判断 33 の「version の導出方法」を再検討（single source = deno.json は維持） |
+| H-DENO4 | リリース自動化の実装フェーズ初期（2026-05-31 採択済） | `deno compile` 後のバイナリの `--version` 出力 | バイナリ出力 vs deno.json の version | S-031 を確定（cli.ts の JSON import 採用、採択済） | build 時に version 定数を生成する codegen へ切替 | 判断 33 の「version の導出方法」を再検討（single source = deno.json は維持） |
 
 ## 仮説層と検証エビデンスの対応
 

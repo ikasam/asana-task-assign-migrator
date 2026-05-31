@@ -49,7 +49,7 @@
 | D-018 | CLI は workspace を人間可読なドメイン名で受け取り、API で GID に解決できるようにする（GID 直指定も従来どおり受ける） | W-009 | 「ドメイン名」は workspace 表示名ではなく organization の登録 email ドメイン。素の workspace（非 organization）には適用不可 → C-018。既存 `--domain`（survey の assignee 用）との命名衝突 → 判断 29 で解消 | 確定 | email_domains が PAT に返るか（H-API8 要検証） |
 | D-019 | main への push のうち deno.json の version が直前から変化した push でのみ、tag 作成と GitHub Release を自動実行し、手動 tag push を不要にする | W-010 | 「毎 push リリース」は過剰 → version 変化条件で限定（判断 31） | 確定 | なし |
 | D-020 | tag 作成と build+publish を同一 workflow run 内で完結させ、cross-workflow トリガーに依存しない（workflow_call の reusable 構成） | W-010 | GITHUB_TOKEN の tag push は他 workflow を非トリガー（C-019）→ 同一 run 化で回避（判断 32）。既存 release.yml ロジックの再利用は任意（必須要件にしない） | 確定 | なし |
-| D-021 | version の single source を deno.json とし、src/cli.ts はそこから導出する。bump は機能追加/バグ修正時の運用規約とする | W-010 | version が 2 箇所に重複（C-020）→ 単一化（判断 33）。bump 忘れの CI 強制は見送り規約に留める（判断 35） | 確定 | compile 同梱（H-DENO4 要検証） |
+| D-021 | version の single source を deno.json とし、src/cli.ts はそこから導出する。bump は機能追加/バグ修正時の運用規約とする | W-010 | version が 2 箇所に重複（C-020）→ 単一化（判断 33）。bump 忘れの CI 強制は見送り規約に留める（判断 35） | 確定 | compile 同梱は H-DENO4 で採択済（2026-05-31） |
 | D-022 | リリース公開前に CI 相当のテストを通し、テスト失敗時はリリースを中止する | W-010 | release が ci.yml と並走し未検証バイナリを公開し得る → release 経路でテスト（判断 34） | 確定 | なし |
 
 ## 要件候補
@@ -86,7 +86,7 @@
 | R26 | deno.json の `.version` が `github.event.before..after` で変化し、かつ同名 `vX.Y.Z` tag が未存在の main push のとき、`vX.Y.Z` tag を作成して push する | システム x 機能 | 確定 | D-019 / 判断 31 | — | force-push / `before` 欠落時は安全側 no-op（S-028） |
 | R27 | tag 作成後、同一 workflow run 内で build + GitHub Release publish を実行する（cross-trigger に依存しない） | システム x 機能 | 確定 | D-020 / 判断 32 | — | — |
 | R28 | deno.json version が不変の main push では tag も release も作らず成功終了する（no-op） | システム x 機能 | 確定 | D-019 / 判断 31 | — | — |
-| R29 | src/cli.ts の `--version` 出力と生成される tag 名が deno.json の version と一致する（single source） | システム x 非機能 | 確定 | D-021 / 判断 33 | H-DENO4 | deno compile での version 同梱（H-DENO4） |
+| R29 | src/cli.ts の `--version` 出力と生成される tag 名が deno.json の version と一致する（single source） | システム x 非機能 | 確定 | D-021 / 判断 33 | H-DENO4 | deno compile での version 同梱は H-DENO4 で採択済（2026-05-31） |
 | R30 | リリースの build に進む前に CI 相当のチェック（fmt/lint/check/test）を通し、失敗時はリリースを中止する。tag は test 通過後に作成・push し、test 失敗時に dangling tag を残さない | システム x 非機能 | 確定 | D-022 / 判断 34 | — | — |
 | R31 | 同名 tag/release が既に存在する場合は fail（loud）し、既存リリースを上書きしない（再リリースは version bump を要する） | システム x 機能 | 確定 | D-019 / 判断 31 | — | — |
 
