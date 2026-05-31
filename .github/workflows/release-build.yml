@@ -40,18 +40,25 @@ jobs:
       - name: Install dependencies (verify frozen lockfile)
         run: deno install --frozen
 
-      # 同名 tag が既にあれば二重リリースを避けて fail する (R31)。
-      # 再リリースは deno.json の version bump を要する。
-      - name: Guard against existing tag
+      # 同名 tag / Release が既にあれば二重リリースを避けて fail する (R31/S-032)。
+      # 再リリースは deno.json の version bump を要する。tag だけでなく Release も
+      # 早期に確認し、test/build を消費した後に gh release create で初めて気付く事態
+      # (tag 削除済みで Release だけ残るケース等) を防ぐ。
+      - name: Guard against existing tag or release
         env:
           VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           tag="v${VERSION}"
           if git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null 2>&1; then
             echo "::error::tag ${tag} already exists; bump the version in deno.json to release"
             exit 1
           fi
-          echo "tag ${tag} is free"
+          if gh release view "${tag}" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            echo "::error::release ${tag} already exists; bump the version in deno.json to release"
+            exit 1
+          fi
+          echo "tag/release ${tag} is free"
 
       # 品質ゲート: build/publish の前に CI 相当のチェックを通す (R30 / 判断 34-B)。
       # ここが失敗すると後続の tag 作成に到達せず、dangling tag を残さない。

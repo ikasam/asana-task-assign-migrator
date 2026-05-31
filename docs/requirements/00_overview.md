@@ -68,7 +68,7 @@
 
 - 手動 tag push なしで GitHub Release を発行できるよう、**main への push を起点にリリースを自動化**する。
 - ただし毎 push リリースは過剰なので、**deno.json の version が変化した push のみ**を対象にする（version 変化検知）。
-- 既存 [release.yml](../../.github/workflows/release.yml)（`on: push: tags`）の build+publish を `workflow_call` の reusable workflow 化し、**同一 workflow run** で tag 作成 → build → publish を完結させる。
+- build+publish ロジックを reusable workflow（[release-build.yml](../../.github/workflows/release-build.yml)、`workflow_call`）に切り出し、[release.yml](../../.github/workflows/release.yml) 自体は main push の caller に置き換える（旧 `on: push: tags` トリガーは廃止）。**同一 workflow run** で tag 作成 → build → publish を完結させる。
 - これは「`GITHUB_TOKEN` で push した tag は他 workflow を `push` イベントでトリガーしない」という GitHub の制約（[C-019](05_constraints.md)）を、cross-trigger に頼らない構成で回避するため。
 - version の single source は deno.json に一本化し、src/cli.ts はそこから導出する（二重定義 [C-020](05_constraints.md) を解消）。
 - 詳細: [判断 31〜35](06_decisions.md) / [設計選択 12〜14](04_design_options.md) / 要件 [R26〜R31](01_requirements.md) / 仕様 [S-028〜S-032](03_specifications.md)。

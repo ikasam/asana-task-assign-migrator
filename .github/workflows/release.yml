@@ -41,6 +41,13 @@ jobs:
         run: |
           set -euo pipefail
           new_version="$(jq -r '.version' deno.json)"
+          # jq -r は .version 欠落時に文字列 "null" を返す。これを誤って
+          # vnull タグ/リリースに使わないよう、空 / "null" は no-op で弾く。
+          if [ -z "${new_version}" ] || [ "${new_version}" = "null" ]; then
+            echo "deno.json に usable な version がない (got: '${new_version}'); no-op"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           if [ -z "${BEFORE}" ] || [ "${BEFORE}" = "0000000000000000000000000000000000000000" ]; then
             echo "no usable 'before' SHA; treating as no-op"
             echo "changed=false" >> "$GITHUB_OUTPUT"

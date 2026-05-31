@@ -13,7 +13,9 @@
 import type { CliArgs, SurveyArgs } from "./types.ts";
 import denoJson from "../deno.json" with { type: "json" };
 
-export const VERSION = denoJson.version;
+// `: string` を明示して、deno.json の構造変化 (version 欠落/型変更) を
+// 型エラーとして早期に検出する (JSON import が any に緩むのを防ぐ)。
+export const VERSION: string = denoJson.version;
 
 export class CliUsageError extends Error {
   constructor(message: string, public hint?: string) {
