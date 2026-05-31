@@ -1,89 +1,89 @@
 name: Release
 
-# `vX.Y.Z` タグの push で各 OS 向け単一バイナリを deno compile し、
-# GitHub Releases に添付する。クロスコンパイルは検証済みのため全ターゲットを
-# 単一の ubuntu runner からビルドする (ネイティブ runner マトリクス不要)。
+# main への push を起点にリリースを自動化する caller workflow。
+# deno.json の version が直前 commit から変化した push のときだけ、reusable な
+# release-build.yml を同一 run 内で呼び、tag 作成 → build → GitHub Release を行う。
+# 手動 tag push (`on: push: tags`) には依存しない: GITHUB_TOKEN の tag push は
+# 他 workflow を `push` で非トリガーにする (C-019) ため、cross-trigger ではなく
+# workflow_call で連携する (判断 32-A)。version 不変の push は no-op (R28)。
 
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
+
+# リリースは直列化する。進行中の release を後続 push でキャンセルしない。
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 permissions:
   contents: read
 
-env:
-  BIN_NAME: asana-task-assign-migrator
-
 jobs:
-  build:
-    name: Build ${{ matrix.target }}
+  detect:
+    name: Detect version change
     runs-on: ubuntu-latest
-    strategy:
-      # 1 ターゲットが失敗しても他のビルドは続行する。
-      fail-fast: false
-      matrix:
-        target:
-          - x86_64-unknown-linux-gnu
-          - aarch64-unknown-linux-gnu
-          - x86_64-apple-darwin
-          - aarch64-apple-darwin
-          - x86_64-pc-windows-msvc
+    outputs:
+      changed: ${{ steps.check.outputs.changed }}
+      version: ${{ steps.check.outputs.version }}
     steps:
+      # before..after の diff を取るため全履歴を取得する。
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-
-      # mise.toml で固定した deno (= CI test / ローカルと同一バージョン) を導入する。
-      # リリースバイナリも暗黙の最新 deno でビルドしない。
-      # token は mise の GitHub releases 取得用にこのステップだけへ絞る。
-      - uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-
-      - name: Install dependencies (verify frozen lockfile)
-        run: deno install --frozen
-
-      # windows-msvc ターゲットでは deno compile が出力名に .exe を自動付与する。
-      - name: Compile
-        run: |
-          deno compile \
-            --target ${{ matrix.target }} \
-            --allow-net=app.asana.com \
-            --allow-env=ASANA_ACCESS_TOKEN \
-            --allow-read \
-            --output "dist/${BIN_NAME}-${{ matrix.target }}" \
-            src/main.ts
-
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: binary-${{ matrix.target }}
-          path: dist/*
-          if-no-files-found: error
-          retention-days: 1
+          fetch-depth: 0
+
+      # deno.json の .version を push の before/after で比較する。
+      # force-push や before 不明 (新規 branch の all-zero SHA) は安全側で no-op。
+      - name: Check deno.json version change
+        id: check
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          new_version="$(jq -r '.version' deno.json)"
+          # jq -r は .version 欠落時に文字列 "null" を返す。これを誤って
+          # vnull タグ/リリースに使わないよう、空 / "null" は no-op で弾く。
+          if [ -z "${new_version}" ] || [ "${new_version}" = "null" ]; then
+            echo "deno.json に usable な version がない (got: '${new_version}'); no-op"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ -z "${BEFORE}" ] || [ "${BEFORE}" = "0000000000000000000000000000000000000000" ]; then
+            echo "no usable 'before' SHA; treating as no-op"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+            echo "'before' commit not available (force-push?); treating as no-op"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          old_version="$(git show "${BEFORE}:deno.json" 2>/dev/null | jq -r '.version' 2>/dev/null || true)"
+          if [ -n "${new_version}" ] && [ "${new_version}" != "${old_version}" ]; then
+            # リリース対象。SemVer 形式を検証し、不正値 (空白/改行/先頭 v 等) は
+            # fail loud で弾く (無効な tag 名 / GITHUB_OUTPUT 破壊を防ぐ)。
+            semver='^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'
+            if [[ ! "${new_version}" =~ $semver ]]; then
+              echo "::error::deno.json version '${new_version}' is not valid SemVer; fix deno.json"
+              exit 1
+            fi
+            echo "version changed: ${old_version:-<none>} -> ${new_version}"
+            {
+              echo "changed=true"
+              echo "version=${new_version}"
+            } >> "$GITHUB_OUTPUT"
+          else
+            echo "version unchanged (${new_version}); no release"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
 
   release:
-    name: Publish release
-    needs: build
-    runs-on: ubuntu-latest
+    name: Release
+    needs: detect
+    if: ${{ needs.detect.outputs.changed == 'true' }}
     permissions:
-      # Releases の作成とアセットのアップロードに必要。
+      # reusable workflow 内の tag push / Release 作成に必要 (caller が付与)。
       contents: write
-    steps:
-      - name: Download all build artifacts
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          path: dist
-          merge-multiple: true
-
-      - name: Generate checksums
-        working-directory: dist
-        run: sha256sum "${BIN_NAME}"-* > SHA256SUMS.txt
-
-      - name: Create GitHub Release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release create "${{ github.ref_name }}" \
-            --repo "${{ github.repository }}" \
-            --title "${{ github.ref_name }}" \
-            --generate-notes \
-            --verify-tag \
-            dist/*
+    uses: ./.github/workflows/release-build.yml
+    with:
+      version: ${{ needs.detect.outputs.version }}

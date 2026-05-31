@@ -24,6 +24,8 @@
 | C-016 | リポジトリにコミットするコードに組織固有値（ドメイン名・workspace GID 等）をハードコードしない。`--domain` / `--workspace` は必須引数とし、会社固有のデフォルトを置かない | セキュリティ / 運用 | プロジェクト共通の開発ポリシー（ローカルパス・組織 identity の非混入） | R16, S-020 | 強 | 不可 | — |
 | C-017 | workspace ユーザー一覧 API（`getUsers`）は一部ユーザーの email を返さない（PAT 可視性制約） | 技術 | Asana API + 2026-05-29 実機検証（714 中 97 が非返却） | R20, H-API7, survey 集計の網羅性 | 中 | 不可（API 仕様） | email 欠落が多すぎて集計が無意味になる場合は判断 27 を再開 |
 | C-018 | ドメイン→GID 解決は organization の `email_domains`（workspace オブジェクトのフィールド）に依存する。素の workspace（`is_organization=false`、ドメイン無し）や、PAT が `email_domains` を返さないケースでは成立しない | 技術 | Asana API（organization のみ email ドメインを持つ）+ C-017 と同種の PAT 可視性リスク | R24, R25, H-API8 | 中 | 不可（API 仕様） | `email_domains` が返らないと判明したら判断 29 を再開し GID 必須へ戻す（C-014 を維持） |
+| C-019 | 既定の `GITHUB_TOKEN` で push した tag/commit は、`push` イベント起因の他 workflow をトリガーしない（GitHub Actions の再帰防止仕様）。例外として `workflow_dispatch` / `repository_dispatch` は `GITHUB_TOKEN` 起因でも起動する | 技術 | GitHub Actions 仕様（[Triggering a workflow from a workflow](https://docs.github.com/actions/using-workflows/triggering-a-workflow#triggering-a-workflow-from-a-workflow)） | リリース自動化の連携方式（[設計選択 12](04_design_options.md)）, R27, S-029 | 強 | 不可（GitHub 側仕様） | — |
+| C-020 | version が deno.json と src/cli.ts に二重定義されており、手動同期が必要だった | 技術 / 保守 | 既存コード（[deno.json](../../deno.json), [src/cli.ts](../../src/cli.ts)） | D-021, R29, S-031 | 中 | 可（deno.json を single source 化して解消） | 解消方針確定（S-031 で deno.json を single source 化、cli.ts は JSON import） |
 
 ## 種類の凡例
 

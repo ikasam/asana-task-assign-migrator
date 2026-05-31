@@ -1,6 +1,6 @@
 # 06 — 判断履歴
 
-対話中に明示的に分岐させた判断（判断 1 〜 28）の記録。各判断について「選択肢 / 採択 / 理由」を残す。判断 25 以降は 2026-05-29 の survey サブコマンド追加フェーズ。
+対話中に明示的に分岐させた判断（判断 1 〜 35）の記録。各判断について「選択肢 / 採択 / 理由」を残す。判断 25〜28 は 2026-05-29 の survey サブコマンド追加フェーズ、判断 29〜30 は 2026-05-30 の `--workspace` ドメイン指定フェーズ、判断 31〜35 は 2026-05-31 のリリース自動化フェーズ。
 
 ## 判断 1: 「すべての未完了タスク」の境界
 
@@ -231,6 +231,43 @@
 - **後方互換**: 既存の GID 指定（migrate / survey とも）はそのまま通る。破壊的変更なし。
 - **関連**: R24, [S-020, S-027](03_specifications.md)
 
+## 判断 31: リリースのトリガー条件（2026-05-31）
+
+- **選択肢**: A version 変化検知（deno.json の version が直前 commit から変化した push のみ） / B commit 規約・release-please / C 毎 push リリース
+- **採択**: **A**
+- **理由**: 既存の deno.json version を source にでき、追加概念が最小。tag 名も deno.json から一意。短命ツール（C-009）に B の bot 運用は過剰、C は中間 commit ごとの過剰リリース。bump 忘れは「リリースされないだけ」で安全側に倒れる。
+- **関連**: D-019, R26, R28, [設計選択 13](04_design_options.md), [S-028](03_specifications.md)
+
+## 判断 32: cross-workflow 連携方式（C-019 回避）
+
+- **背景**: `GITHUB_TOKEN` で push した tag は `push` イベント起因の他 workflow をトリガーしない（[C-019](05_constraints.md)）。素朴な「main-push → tag push → release.yml(`push:tags`) 起動」は成立しない。
+- **選択肢**: A reusable workflow / 同一 run（`workflow_call`） / B 昇格トークン（PAT / GitHub App token / deploy key）で tag push し既存 release.yml を起動 / C `workflow_dispatch` ・ `repository_dispatch` で明示起動
+- **採択**: **A**
+- **理由**: secret 管理ゼロで C-019 を構造的に回避でき、最小権限の現行 `permissions` と整合。B はトークン寿命/scope と「失効で静かに停止」リスク、C は dispatch と push:tags の二重起動設計が要る。
+- **関連**: D-020, R27, [C-019](05_constraints.md), [設計選択 12](04_design_options.md), [S-029](03_specifications.md)
+
+## 判断 33: version の single source
+
+- **選択肢**: A deno.json を source（cli.ts は導出） / B tag を source / C 現状維持（2 箇所手動同期）
+- **採択**: **A**
+- **理由**: 判断 31-A（version 変化検知）と最も相性が良く、tag 名も deno.json から一意に決まる。二重定義（[C-020](05_constraints.md)）を根治。bump は機能追加/バグ修正時の運用規約とする（強制は判断 35）。
+- **補足**: cli.ts は `import ... with { type: "json" }` で deno.json から version を読む（[S-031](03_specifications.md)）。compile 同梱は [H-DENO4](02_hypotheses.md) で検証。偽なら build 時 codegen にフォールバック（single source = deno.json は維持）。
+- **関連**: D-021, R29, [C-020](05_constraints.md), [S-031](03_specifications.md), [H-DENO4](02_hypotheses.md)
+
+## 判断 34: リリースを CI green に依存させるか
+
+- **選択肢**: A 依存させない（ci.yml と並走） / B release 経路で再度テスト（build 前に fmt/lint/check/test） / C `workflow_run` で ci 成功後に発火
+- **採択**: **B**
+- **理由**: リリースは不可逆な公開なので自己完結で品質検証したい。release の build はバイナリ生成のみでテストスイートを走らせないため、A だと未検証バイナリを公開し得る。C は `workflow_run` の `GITHUB_TOKEN` 起因トリガー条件が C-019 と同種の罠で複雑。tag は test 通過後に push し dangling tag を避ける。
+- **関連**: D-022, R30, [設計選択 14](04_design_options.md), [S-030](03_specifications.md)
+
+## 判断 35: bump 忘れを CI で強制するか
+
+- **選択肢**: A 規約のみ（ドキュメント化） / B CI で強制（src 変更ありで version 据え置きなら fail） / C ラベル例外つき強制
+- **採択**: **A**
+- **理由**: bump 忘れの失敗モードは「リリースが出ない」だけで安全側に倒れる。B は docs/ci/test-only PR で誤検知が多く、例外運用（C）まで作ると割に合わない。忘れが頻発したら B/C へ昇格する。
+- **関連**: D-021, R30
+
 ---
 
 ## 棄却された案の整理（再検討トリガー付き）
@@ -254,6 +291,13 @@
 | survey: email 個別再解決 | 判断 27 | email 欠落が集計を無意味にするほど多いと判明 |
 | bare 呼び出し（サブコマンド省略）の維持 | 判断 26 | 既存利用者の移行コストが破壊コストを上回ると判明 |
 | workspace 表示名での指定 | 判断 29（ドメイン指定は採択、表示名は非対応のまま） | 同名 workspace を曖昧性なく区別する手段が確立したら |
+| 毎 push リリース | 判断 31 | リリース頻度を上げたい / version 変化検知が運用に乗らないと判明 |
+| commit 規約 / release-please bot | 判断 31 | 自動 version 決定 / changelog 自動生成のニーズが具体化 |
+| GITHUB_TOKEN で tag push → release.yml(`push:tags`) 起動 | 判断 32（C-019 で不成立） | GitHub が `GITHUB_TOKEN` の再帰防止を緩和（事実上なし） |
+| 昇格トークン（PAT / App / deploy key）で tag push | 判断 32 | reusable 構成が困難、または release.yml を無改修で残す要件が再浮上 |
+| tag を version の single source | 判断 33 | tag 起点運用へ切り替える要望 |
+| リリースを ci.yml と並走（品質ゲートなし） | 判断 34 | テスト時間が長くリリースを急ぎたい等で並走を許容 |
+| bump 忘れの CI 強制 | 判断 35 | bump 忘れによるリリース漏れが頻発 |
 
 ## 関連
 
