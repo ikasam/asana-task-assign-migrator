@@ -334,6 +334,43 @@ error: no workspace found for domain "example.com".
     9876543210  Personal          (not an organization, no domain)
 ```
 
+## リリース自動化仕様（2026-05-31 追加、S-028〜S-032）
+
+main への push を起点に GitHub Release を自動化する。要件 [R26〜R31](01_requirements.md) を満たす。既存の [release.yml](../../.github/workflows/release.yml)（`on: push: tags`）と [ci.yml](../../.github/workflows/ci.yml) を前提に、tag 起点の手動運用を自動化に置き換える。
+
+| ID | 仕様 | 状態 | 関連要件 | 依存する仮説 | 採択基準 | 下位への制約 | 未決事項 |
+|---|---|---|---|---|---|---|---|
+| S-028 | リリース workflow の trigger は `on: push: branches:[main]`。リリース要否は `github.event.before` と `github.event.after` の `deno.json` `.version` を比較して判定する。`before` が all-zero（新規 branch）や force-push 等で解決できないときは安全側に no-op（リリースしない） | 確定 | R26, R28 | — | version 変化時のみ後続実行、不変時は no-op で成功終了 | 複数 commit を含む push でも before..after の端点比較で判定する（中間 commit の version 揺れは見ない） | merge commit 運用（PR マージ）で before=旧 main tip / after=merge commit となり判定可能 |
+| S-029 | build + GitHub Release publish を `workflow_call` の reusable workflow 化し、main-push の caller が version 変化検知後に `uses:` で呼ぶ。cross-workflow の `push: tags` トリガーには依存しない（C-019 回避）。tag は build/publish より前に remote へ push 済みにして既存の `gh release create --verify-tag` を維持する | 確定 | R27 | — | 同一 run 内で tag→build→publish が完結する | reusable workflow は `permissions: contents: write` を要する | 既存 release.yml の `on: push: tags` を手動 fallback として残すか否かは実装時（残すなら R31 の idempotency で二重リリースを防ぐ） |
+| S-030 | リリース経路は build の前段で `deno install --frozen` + `deno task fmt:check` / `lint` / `check` / `test` を実行し、失敗ならジョブ失敗（= リリース中止）。**tag の作成・push は test 通過後に行い、test 失敗時に dangling tag を残さない**。順序の不変条件: test pass → tag push → build → `gh release create --verify-tag` | 確定 | R30 | — | test 失敗時は tag も release も作られない | ci.yml と同一の deno version（mise pin）を使う | — |
+| S-031 | src/cli.ts は `import cfg from "../deno.json" with { type: "json" }` で version を取得し、`export const VERSION` のハードコードを廃止する。値の compile 同梱は H-DENO4 で検証 | 確定 | R29 | H-DENO4 | `--version` 出力が deno.json の version と一致 | deno compile に deno.json が含まれること（H-DENO4 棄却なら build 時 codegen にフォールバック） | — |
+| S-032 | tag 名は `v${deno.json.version}`（例 `v0.2.0`）。作成前に同名 tag/release の存在を確認し、既存なら exit 非ゼロで停止して既存リリースを上書きしない（R31）。version bump 無しの再リリースは不可 | 確定 | R31 | — | 同名既存で停止、新 version で成功 | — | — |
+
+### リリース自動化フロー（S-028〜S-032）
+
+```
+on: push: branches:[main]
+  │
+  ├─ [detect] github.event.before..after で deno.json .version を比較
+  │     ├─ 不変           → no-op で成功終了（S-028 / R28）
+  │     └─ before 解決不可 → 安全側 no-op
+  │
+  └─ 変化あり: tag = v<new version>
+        ├─ 同名 tag/release が既存 → exit≠0 で停止（S-032 / R31）
+        ├─ [test] deno install --frozen + fmt:check/lint/check/test
+        │     └─ 失敗 → リリース中止（tag は未作成 = dangling なし、S-030 / R30）
+        ├─ [tag]  test 通過後に annotated tag を作成し remote へ push
+        │          （GITHUB_TOKEN で可。push:tags 連鎖に依存しないので C-019 に非該当）
+        └─ [release] reusable workflow（workflow_call）で
+              build（deno compile × ターゲット）→ gh release create <tag> --verify-tag
+```
+
+### C-019（GITHUB_TOKEN の tag push 非トリガー）への対処メモ
+
+- 素朴な「main-push workflow が `GITHUB_TOKEN` で tag を push → `release.yml`(`on: push: tags`) が起動」は **成立しない**（GitHub の再帰防止。tag は作られるが release.yml は沈黙）。
+- 本仕様は tag push の連鎖トリガーに頼らず、**同一 run 内で reusable workflow を直接呼ぶ**ことで回避する（[設計選択 12](04_design_options.md) 採用案 A）。secret 不要。
+- 例外: `workflow_dispatch` / `repository_dispatch` は `GITHUB_TOKEN` 起因でも起動するため、将来 dispatch 方式へ切り替える余地はある（[設計選択 12](04_design_options.md) 案 C）。
+
 ## 関連
 
 - [要件](01_requirements.md)

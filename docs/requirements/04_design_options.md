@@ -169,6 +169,51 @@
 
 ---
 
+## 設計選択 12: cross-workflow トリガー方式（C-019 回避、2026-05-31）
+
+| 案 | 概要 | 満たす要件 | 満たせない/危うい要件 | 追加制約 | リスク | 検証すべき実装仮説 |
+|---|---|---|---|---|---|---|
+| **A. reusable workflow / 同一 run（採用）** | main-push caller が tag を作り、`workflow_call` で build+publish を同一 run で実行 | R27 | — | reusable に `contents: write` | — | — |
+| B. 昇格トークンで tag push | PAT / GitHub App token / deploy key で tag を push し、既存 release.yml(`push:tags`) を起動 | R27 | — | secret 管理（PAT/App/SSH）・寿命・scope | トークン失効でリリースが静かに停止 | — |
+| C. workflow_dispatch / repository_dispatch | tag 作成後 dispatch で release を起動（`GITHUB_TOKEN` で可、C-019 の例外） | R27 | — | release 側に dispatch trigger + ref 受け渡し | dispatch と push:tags の二重起動設計が要る | — |
+
+**採用: A**
+**理由**: secret 管理ゼロで [C-019](05_constraints.md)（`GITHUB_TOKEN` の tag push が他 workflow を非トリガー）を構造的に回避でき、最小権限の現行 `permissions` 設計と整合する。B は release.yml を無改修で残せる利点があるが、トークンの寿命/scope 管理と「失効でリリースが静かに止まる」運用リスクを負う。C は `GITHUB_TOKEN` で起動できる正当な手段だが、push:tags との二重起動を設計で潰す必要があり複雑。
+
+参照: [判断 32](06_decisions.md)、[制約 C-019](05_constraints.md)、要件 [R27](01_requirements.md)、[S-029](03_specifications.md)
+
+---
+
+## 設計選択 13: リリースのトリガー条件（2026-05-31）
+
+| 案 | 概要 | 満たす要件 | 満たせない/危うい要件 | 追加制約 | リスク | 検証すべき実装仮説 |
+|---|---|---|---|---|---|---|
+| **A. version 変化検知（採用）** | deno.json の `.version` が前 commit から変化した push のみリリース | R26, R28 | — | version の single source 化（D-021） | bump 忘れでリリース漏れ（規約で担保、判断 35） | H-DENO4 |
+| B. commit 規約 / release-please | Conventional Commits / release-please bot で version 決定とリリース | R26 | — | 新ツール / bot 導入・運用 | 短命ツールに過剰 | — |
+| C. 毎 push リリース | main に入るたびに必ずリリース（連番 / prerelease） | — | R28（no-op が無い） | 連番 / prerelease の番号設計 | パッチごとの過剰リリース | — |
+
+**採用: A**
+**理由**: 既存の deno.json version フィールドを source にでき、追加概念が最小。tag 名も deno.json から一意に決まる。短命ツール（[C-009](05_constraints.md)）に B の bot 運用は過剰、C は中間 commit ごとに無条件公開となり過剰。bump 忘れの失敗モードは「リリースが出ないだけ」で安全側に倒れる。
+
+参照: [判断 31, 33](06_decisions.md)、要件 [R26, R28](01_requirements.md)、[S-028](03_specifications.md)
+
+---
+
+## 設計選択 14: リリースの品質ゲート（2026-05-31）
+
+| 案 | 概要 | 満たす要件 | 満たせない/危うい要件 | 追加制約 | リスク | 検証すべき実装仮説 |
+|---|---|---|---|---|---|---|
+| A. ci.yml と並走（依存なし） | version 変化で即リリース | — | R30（未検証バイナリ公開リスク） | — | テスト失敗中でも公開され得る | — |
+| **B. release 経路でテスト（採用）** | build 前に fmt/lint/check/test を実行、失敗で中止 | R30 | — | tag は test 通過後に push（dangling 回避） | — | — |
+| C. workflow_run で ci 成功後に発火 | ci.yml 完了 → release を起動 | R30 | — | workflow_run の `GITHUB_TOKEN` トリガー条件 | C-019 同様のトリガー仕様の罠で複雑化 | — |
+
+**採用: B**
+**理由**: リリースは不可逆な「公開」アクションなので、release 経路を自己完結の品質ゲートにする。release の build はバイナリ生成（compile-smoke 相当）はするがテストスイートは走らせないため、ci.yml と並走（A）させると未検証バイナリを公開し得る。C は workflow_run の `GITHUB_TOKEN` 起因トリガー条件が C-019 と同種の罠を持ち複雑。tag は test 通過後に push し、test 失敗時に dangling tag を残さない。
+
+参照: [判断 34](06_decisions.md)、要件 [R30](01_requirements.md)、[S-030](03_specifications.md)
+
+---
+
 ## 関連
 
 - [要件](01_requirements.md)

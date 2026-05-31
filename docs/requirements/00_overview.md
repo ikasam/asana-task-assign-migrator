@@ -64,6 +64,15 @@
 - CLI はサブコマンド制に再構成し、`migrate` / `survey` を明示必須とする（bare 呼び出しは廃止 = breaking、VERSION 0.2.0）。
 - 詳細: [判断 25〜28](06_decisions.md) / [設計選択 10, 11](04_design_options.md) / 要件 [R16〜R23](01_requirements.md)。
 
+## 追加スコープ — リリース自動化（2026-05-31）
+
+- 手動 tag push なしで GitHub Release を発行できるよう、**main への push を起点にリリースを自動化**する。
+- ただし毎 push リリースは過剰なので、**deno.json の version が変化した push のみ**を対象にする（version 変化検知）。
+- 既存 [release.yml](../../.github/workflows/release.yml)（`on: push: tags`）の build+publish を `workflow_call` の reusable workflow 化し、**同一 workflow run** で tag 作成 → build → publish を完結させる。
+- これは「`GITHUB_TOKEN` で push した tag は他 workflow を `push` イベントでトリガーしない」という GitHub の制約（[C-019](05_constraints.md)）を、cross-trigger に頼らない構成で回避するため。
+- version の single source は deno.json に一本化し、src/cli.ts はそこから導出する（二重定義 [C-020](05_constraints.md) を解消）。
+- 詳細: [判断 31〜35](06_decisions.md) / [設計選択 12〜14](04_design_options.md) / 要件 [R26〜R31](01_requirements.md) / 仕様 [S-028〜S-032](03_specifications.md)。
+
 ## 人間に最終確認した事項
 
-要件分析 [判断 1〜22](06_decisions.md) で確認済み。
+要件分析 [判断 1〜22](06_decisions.md) で確認済み。リリース自動化フェーズは [判断 31〜35](06_decisions.md) で確認済み。
