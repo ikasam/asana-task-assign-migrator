@@ -4,7 +4,7 @@
 # バージョンが常に一致する (暗黙の「最新」を使わない = 挙動差とサプライチェーンリスクの低減)。
 
 [tools]
-deno = "2.5.6"        # プロジェクトのランタイム。ローカル / CI で同一バージョンに固定
+deno = "2.8.1"        # プロジェクトのランタイム。ローカル / CI で同一バージョンに固定
 actionlint = "1.7.12" # GitHub Actions ワークフローの静的検査
 pinact = "4.0.0"      # GitHub Actions をコミット SHA に pin / 検証
 # actionlint は PATH 上に shellcheck があれば run: スクリプトを shellcheck に渡す。
