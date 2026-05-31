@@ -60,6 +60,13 @@ jobs:
           fi
           old_version="$(git show "${BEFORE}:deno.json" 2>/dev/null | jq -r '.version' 2>/dev/null || true)"
           if [ -n "${new_version}" ] && [ "${new_version}" != "${old_version}" ]; then
+            # リリース対象。SemVer 形式を検証し、不正値 (空白/改行/先頭 v 等) は
+            # fail loud で弾く (無効な tag 名 / GITHUB_OUTPUT 破壊を防ぐ)。
+            semver='^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'
+            if [[ ! "${new_version}" =~ $semver ]]; then
+              echo "::error::deno.json version '${new_version}' is not valid SemVer; fix deno.json"
+              exit 1
+            fi
             echo "version changed: ${old_version:-<none>} -> ${new_version}"
             {
               echo "changed=true"
