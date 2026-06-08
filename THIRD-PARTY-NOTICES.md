@@ -15,10 +15,12 @@ distributed as a compiled binary (e.g. via `deno compile`).
 > Distributors whose compliance requirements call for an exhaustive
 > license-text bundle can expand this file using the procedures below.
 
-All dependencies are distributed under permissive licenses
-(MIT / ISC / BSD / Apache-2.0) that allow redistribution in source and
-compiled/binary form, including commercial use. None impose copyleft
-obligations on this project.
+The dependencies are distributed under permissive licenses
+(MIT / ISC / BSD / Apache-2.0), plus one **CC-BY-4.0** data package
+(`caniuse-lite`, pulled in transitively via `browserslist`). All allow
+redistribution in source and compiled/binary form, including commercial use,
+and none impose copyleft obligations on this project; CC-BY-4.0 requires that
+its attribution be preserved.
 
 ---
 
@@ -252,11 +254,14 @@ And the Apache License 2.0 text matching the `package.json` declaration:
 ## Transitive dependencies
 
 The `asana` SDK pulls in additional packages (notably the `superagent` HTTP
-client and the `@babel/*` toolchain families). These are distributed under
-permissive licenses — predominantly **MIT**, with some **ISC**,
-**BSD-2-Clause**, **BSD-3-Clause**, and **Apache-2.0** — all of which permit
-redistribution in source and binary form provided their copyright and license
-texts are included.
+client and the `@babel/*` toolchain families). These are distributed
+predominantly under **MIT**, with some **ISC**, **BSD-2-Clause**,
+**BSD-3-Clause**, and **Apache-2.0**. One non-software-code dependency,
+`caniuse-lite` (the browser-support dataset, reached via
+`@babel/cli` → `browserslist`), is licensed under **CC-BY-4.0**. All of these
+permit redistribution in source and binary form provided their copyright and
+license texts are included; CC-BY-4.0 additionally requires preserving the
+caniuse attribution.
 
 Their individual license texts are **not reproduced individually here.** The
 authoritative, version-pinned inventory of these packages is
