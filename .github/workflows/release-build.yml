@@ -141,10 +141,16 @@ jobs:
       # Releases の作成とアセットのアップロードに必要。
       contents: write
     steps:
-      # Release アセットに同梱する LICENSE / THIRD-PARTY-NOTICES.md を取得する。
+      # Release アセットに同梱する LICENSE と、生成元の deno.json/deno.lock を取得する。
       # download-artifact より前に checkout する (checkout は workspace を clean する
       # ため、dist へ展開した後に行うと成果物を消してしまう)。
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      # THIRD-PARTY-NOTICES.txt を Release 時に再生成するため、test/build と同一の
+      # deno を導入する。
+      - uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
 
       - name: Download all build artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -152,10 +158,15 @@ jobs:
           path: dist
           merge-multiple: true
 
+      # 全 npm 依存 + Deno ランタイムのライセンス本文を集約した完全な notice を
+      # deno.lock から再生成し、リポジトリ同梱版とのドリフトに依らず最新版を配布する。
+      - name: Generate complete third-party notices
+        run: deno task notices
+
       # コンパイル済みバイナリ配布時に求められる帰属表示をアセットに同梱する。
       # checksum は "${BIN_NAME}"-* のみを対象とするため、この cp との順序は問わない。
       - name: Bundle license notices
-        run: cp LICENSE THIRD-PARTY-NOTICES.md dist/
+        run: cp LICENSE THIRD-PARTY-NOTICES.txt dist/
 
       - name: Generate checksums
         working-directory: dist

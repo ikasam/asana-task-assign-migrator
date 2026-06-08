@@ -5,15 +5,14 @@ third-party software that is bundled into the executable when it is
 distributed as a compiled binary (e.g. via `deno compile`).
 
 > [!NOTE]
-> These notices apply when the tool is distributed as a **compiled binary**;
-> running it from source via `deno task` / `deno run` does not bundle
-> dependencies. This file reproduces the project's own license and the Asana
-> SDK license in full, and identifies the SDK's transitive dependencies. The
-> authoritative, version-pinned inventory of every bundled npm package is
-> [`deno.lock`](./deno.lock); compiled binaries additionally embed the Deno
-> runtime (see [Deno runtime](#deno-runtime-compiled-binaries-only)).
-> Distributors whose compliance requirements call for an exhaustive
-> license-text bundle can expand this file using the procedures below.
+> This Markdown file is the **human-readable explainer**. The complete,
+> machine-generated attribution bundle — every npm package resolved from
+> [`deno.lock`](./deno.lock) plus the embedded Deno runtime, with each license
+> text reproduced in full — is **`THIRD-PARTY-NOTICES.txt`**, produced by
+> `deno task notices`. The release workflow regenerates that file and ships it
+> next to every compiled binary, so distributors do not need to assemble it by
+> hand. These notices apply only to **compiled binaries**; running from source
+> via `deno task` / `deno run` bundles none of this software.
 
 The dependencies are distributed under permissive licenses
 (MIT / ISC / BSD / Apache-2.0), plus one **CC-BY-4.0** data package
@@ -263,29 +262,32 @@ permit redistribution in source and binary form provided their copyright and
 license texts are included; CC-BY-4.0 additionally requires preserving the
 caniuse attribution.
 
-Their individual license texts are **not reproduced individually here.** The
-authoritative, version-pinned inventory of these packages is
-[`deno.lock`](./deno.lock).
+Rather than reproduce each of these texts in this Markdown explainer, the full
+license text of every package is collected into **`THIRD-PARTY-NOTICES.txt`**
+by the generator described below.
 
 > Note: `deno compile` bundles modules based on the import graph resolved at
 > compile time (static imports plus any reachable dynamic imports), not on
-> runtime code-path reachability. Treat every package resolved from
-> `deno.lock` for the compiled entry point as potentially bundled, rather than
-> assuming unused code paths are stripped.
+> runtime code-path reachability. The generator errs on the side of
+> over-inclusion: it walks the entire npm graph resolved from `deno.lock`
+> (a superset of what a single entry point strictly reaches), so no bundled
+> package is omitted.
 
-### Producing an exhaustive per-package bundle
+### Generating the complete bundle
 
-The licenses above (the project's MIT, the Asana SDK's MIT + Apache-2.0) are
-the notices shipped with this project's binaries. If your distribution policy
-requires reproducing the full license text of every transitive package as
-well, assemble that expanded bundle as follows:
+`THIRD-PARTY-NOTICES.txt` is produced by
+[`scripts/gen_third_party_notices.ts`](./scripts/gen_third_party_notices.ts):
 
-1. Enumerate the packages bundled for the compiled entry point from
-   [`deno.lock`](./deno.lock).
-2. For each package, retrieve its license text and copyright notice from its
-   npm registry entry or source repository.
-3. Concatenate those into the notice bundle (this file, or a generated
-   `THIRD-PARTY-NOTICES` artifact) shipped next to the binary.
+```sh
+deno task notices
+```
+
+The task materializes `node_modules` from the frozen lockfile, reproduces the
+license file of every resolved npm package (recording each package's declared
+SPDX identifier alongside it — which is how the Asana SDK's `Apache 2.0`
+declaration and its MIT license text both appear), and appends the embedded
+Deno runtime notice. The release workflow runs this task and ships the result
+next to each binary, so the published artifact is always current.
 
 ---
 
@@ -299,11 +301,10 @@ BSD-3-Clause and numerous Rust crates under MIT / Apache-2.0 / BSD). This
 applies only to compiled binaries; running from source via `deno task` /
 `deno run` uses the locally installed Deno and bundles none of this.
 
-These runtime components are **not reproduced here.** Deno publishes the
-authoritative third-party license list for the runtime at
-https://license.deno.dev/ (see also the
+The generated `THIRD-PARTY-NOTICES.txt` reproduces Deno's own MIT license (for
+the build's pinned version in `mise.toml`) and points to Deno's authoritative
+third-party license list at https://license.deno.dev/ for the V8/Rust native
+component notices (see also the
 [`deno compile` docs](https://docs.deno.com/runtime/reference/cli/compile/)).
-A distribution policy that requires reproducing the full text of every
-embedded component should include that runtime license list — pinned to the
-Deno version used for the build (`mise.toml`) — alongside the npm notices
-produced by the procedure above.
+A distribution policy that requires reproducing the full text of every native
+component should consult that list pinned to the build's Deno version.
