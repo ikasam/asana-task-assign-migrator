@@ -75,8 +75,8 @@ chmod +x asana-task-assign-migrator
 Deno 2.x があれば、ビルドせずに `deno task` 経由で実行できます。
 
 ```sh
-deno task migrate --workspace 1234567890 --from old.user@example.com --to new.user@example.com --dry-run
-deno task survey  --workspace 1234567890 --domain old-company.com
+deno task migrate --workspace 12345678901234 --from old.user@example.com --to new.user@example.com --dry-run
+deno task survey  --workspace 12345678901234 --domain example.com
 ```
 
 ## Usage
@@ -136,7 +136,7 @@ ENVIRONMENT VARIABLES:
 
 ```sh
 asana-task-assign-migrator migrate \
-  --workspace 1234567890 \
+  --workspace 12345678901234 \
   --from old.user@example.com \
   --to   new.user@example.com \
   --dry-run
@@ -147,18 +147,18 @@ asana-task-assign-migrator migrate \
 ```
 === Asana Task Assignee Migration (DRY RUN) ===
 
-Workspace : My Company (gid: 1234567890)
-From      : old.user@example.com (Old User, gid: 111)
-To        : new.user@example.com (New User, gid: 222)  ✓ member of workspace
+Workspace : My Company (gid: 12345678901234)
+From      : old.user@example.com (Old User, gid: 12345678900001)
+To        : new.user@example.com (New User, gid: 12345678900002)  ✓ member of workspace
 
 Discovering incomplete tasks assigned to old.user@example.com...
 Found 47 tasks.
 
-  [ 1] 9876543210  Q2 planning document
-  [ 2] 9876543211  Review onboarding flow
-  [ 3] 9876543212  Bug: search returns 500
+  [ 1] 12345678900011  Q2 planning document
+  [ 2] 12345678900012  Review onboarding flow
+  [ 3] 12345678900013  Bug: search returns 500
   ...
-  [47] 9876543299  Update docs
+  [47] 12345678900015  Update docs
 
 DRY RUN: no changes were made.
 Re-run without --dry-run to execute migration.
@@ -168,7 +168,7 @@ Re-run without --dry-run to execute migration.
 
 ```sh
 asana-task-assign-migrator migrate \
-  --workspace 1234567890 \
+  --workspace 12345678901234 \
   --from old.user@example.com \
   --to   new.user@example.com
 ```
@@ -190,17 +190,17 @@ Continue? [y/N]:
 ```
 === Asana Task Assignee Migration ===
 
-Workspace : My Company (gid: 1234567890)
+Workspace : My Company (gid: 12345678901234)
 From      : old.user@example.com → To: new.user@example.com
 
 Discovering tasks... 47 found.
 Migrating 47 tasks...
 
-  [ 1/47] 9876543210  Q2 planning document             ✓
-  [ 2/47] 9876543211  Review onboarding flow           ✓
-  [ 3/47] 9876543212  Bug: search returns 500          ✗ HTTP 403 not_authorized
+  [ 1/47] 12345678900011  Q2 planning document             ✓
+  [ 2/47] 12345678900012  Review onboarding flow           ✓
+  [ 3/47] 12345678900013  Bug: search returns 500          ✗ HTTP 403 not_authorized
   ...
-  [47/47] 9876543299  Update docs                      ✓
+  [47/47] 12345678900015  Update docs                      ✓
 
 Done.
   Total    : 47
@@ -208,8 +208,8 @@ Done.
   Failed   : 2
 
 Failures:
-  9876543212  Bug: search returns 500     HTTP 403 not_authorized
-  9876543220  Production hotfix           HTTP 500 server_error
+  12345678900013  Bug: search returns 500     HTTP 403 not_authorized
+  12345678900014  Production hotfix           HTTP 500 server_error
 
 Re-run the same command to retry failed tasks (idempotent).
 ```
@@ -218,7 +218,7 @@ Re-run the same command to retry failed tasks (idempotent).
 
 ```sh
 asana-task-assign-migrator migrate \
-  --workspace 1234567890 \
+  --workspace 12345678901234 \
   --from old.user@example.com \
   --to   new.user@example.com \
   --dry-run --json
@@ -227,12 +227,12 @@ asana-task-assign-migrator migrate \
 ```json
 {
   "mode": "dry-run",
-  "workspace": { "gid": "1234567890", "name": "My Company" },
-  "from": { "email": "old.user@example.com", "gid": "111", "name": "Old User" },
-  "to":   { "email": "new.user@example.com", "gid": "222", "name": "New User", "isMember": true },
+  "workspace": { "gid": "12345678901234", "name": "My Company" },
+  "from": { "email": "old.user@example.com", "gid": "12345678900001", "name": "Old User" },
+  "to":   { "email": "new.user@example.com", "gid": "12345678900002", "name": "New User", "isMember": true },
   "tasks": [
-    { "gid": "9876543210", "name": "Q2 planning document" },
-    { "gid": "9876543211", "name": "Review onboarding flow" }
+    { "gid": "12345678900011", "name": "Q2 planning document" },
+    { "gid": "12345678900012", "name": "Review onboarding flow" }
   ],
   "count": 47
 }
@@ -244,7 +244,7 @@ asana-task-assign-migrator migrate \
 
 ```sh
 asana-task-assign-migrator survey \
-  --workspace 1234567890 \
+  --workspace 12345678901234 \
   --domain example.com
 ```
 
@@ -252,7 +252,7 @@ asana-task-assign-migrator survey \
 
 ```
 === Unmigrated-task survey ===
-workspace : My Company (1234567890)
+workspace : My Company (12345678901234)
 domain    : @example.com
 
 workspace has 714 user(s); 43 match @example.com.

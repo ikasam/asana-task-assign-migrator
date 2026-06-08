@@ -21,9 +21,9 @@ function captureWriter() {
 }
 
 const baseArgs: CliArgs = {
-  workspace: "1",
-  from: "old@x.io",
-  to: "new@x.io",
+  workspace: "12345678901234",
+  from: "old@example.com",
+  to: "new@example.com",
   dryRun: false,
   json: false,
   quiet: false,
@@ -31,13 +31,13 @@ const baseArgs: CliArgs = {
   yes: false,
 };
 
-const ws: Workspace = { gid: "1234567890", name: "My Company" };
-const from: User = { gid: "111", email: "old@x.io", name: "Old User" };
-const to: User = { gid: "222", email: "new@x.io", name: "New User" };
+const ws: Workspace = { gid: "12345678901234", name: "My Company" };
+const from: User = { gid: "12345678900001", email: "old@example.com", name: "Old User" };
+const to: User = { gid: "12345678900002", email: "new@example.com", name: "New User" };
 
 const sampleTasks: AsanaTask[] = [
-  { gid: "9876543210", name: "Q2 planning document", assigneeGid: "111" },
-  { gid: "9876543211", name: "Review onboarding flow", assigneeGid: "111" },
+  { gid: "12345678900011", name: "Q2 planning document", assigneeGid: "12345678900001" },
+  { gid: "12345678900012", name: "Review onboarding flow", assigneeGid: "12345678900001" },
 ];
 
 Deno.test("renderer (human, dry-run): banner + task list + footer", () => {
@@ -51,12 +51,15 @@ Deno.test("renderer (human, dry-run): banner + task list + footer", () => {
 
   const text = cap.out();
   assertStringIncludes(text, "Asana Task Assignee Migration (DRY RUN)");
-  assertStringIncludes(text, `Workspace : My Company (gid: 1234567890)`);
-  assertStringIncludes(text, `From      : old@x.io (Old User, gid: 111)`);
-  assertStringIncludes(text, `To        : new@x.io (New User, gid: 222)  ✓ member of workspace`);
-  assertStringIncludes(text, `Discovering incomplete tasks assigned to old@x.io`);
+  assertStringIncludes(text, `Workspace : My Company (gid: 12345678901234)`);
+  assertStringIncludes(text, `From      : old@example.com (Old User, gid: 12345678900001)`);
+  assertStringIncludes(
+    text,
+    `To        : new@example.com (New User, gid: 12345678900002)  ✓ member of workspace`,
+  );
+  assertStringIncludes(text, `Discovering incomplete tasks assigned to old@example.com`);
   assertStringIncludes(text, "Found 2 tasks.");
-  assertStringIncludes(text, "9876543210  Q2 planning document");
+  assertStringIncludes(text, "12345678900011  Q2 planning document");
   assertStringIncludes(text, "DRY RUN: no changes were made.");
 });
 
@@ -148,7 +151,7 @@ Deno.test("renderer (json): payload is single JSON object on stdout", () => {
   const parsed = JSON.parse(text);
   assertEquals(parsed.mode, "dry-run");
   assertEquals(parsed.count, 2);
-  assertEquals(parsed.workspace.gid, "1234567890");
+  assertEquals(parsed.workspace.gid, "12345678901234");
   assertEquals(parsed.tasks.length, 2);
 });
 
@@ -166,7 +169,7 @@ Deno.test("confirm: accepts y/yes (case-insensitive), rejects others", () => {
 // ---- survey rendering ----
 
 const surveyArgs: SurveyArgs = {
-  workspace: "1",
+  workspace: "12345678901234",
   domain: "example.com",
   json: false,
   verbose: false,
@@ -175,7 +178,7 @@ const surveyArgs: SurveyArgs = {
 
 const surveyPayload: SurveyPayload = {
   mode: "survey",
-  workspace: { gid: "1234567890", name: "My Company" },
+  workspace: { gid: "12345678901234", name: "My Company" },
   domain: "example.com",
   totalUsers: 714,
   emailInvisibleUsers: 97,
@@ -184,13 +187,13 @@ const surveyPayload: SurveyPayload = {
   totalIncompleteTasks: 5,
   accounts: [
     {
-      gid: "111",
+      gid: "12345678900001",
       name: "Alice",
       email: "alice@example.com",
       count: 5,
-      tasks: [{ gid: "t1", name: "Task 1", assigneeGid: "111" }],
+      tasks: [{ gid: "t1", name: "Task 1", assigneeGid: "12345678900001" }],
     },
-    { gid: "222", name: "Bob", email: "bob@example.com", count: 0, tasks: [] },
+    { gid: "12345678900002", name: "Bob", email: "bob@example.com", count: 0, tasks: [] },
   ],
   erroredAccounts: 0,
 };
@@ -200,7 +203,7 @@ Deno.test("renderSurvey (human): header, breakdown, invisible note, summary", ()
   renderSurvey(surveyArgs, surveyPayload, cap.w);
   const text = cap.out();
   assertStringIncludes(text, "=== Unmigrated-task survey ===");
-  assertStringIncludes(text, "workspace : My Company (1234567890)");
+  assertStringIncludes(text, "workspace : My Company (12345678901234)");
   assertStringIncludes(text, "domain    : @example.com");
   assertStringIncludes(text, "714 user(s); 2 match @example.com");
   assertStringIncludes(text, "97 user(s) returned no email");
@@ -234,7 +237,7 @@ Deno.test("renderSurvey: per-account error surfaced in human and quiet (R23)", (
     accountsWithTasks: 0,
     accounts: [
       {
-        gid: "333",
+        gid: "12345678900003",
         name: "Carol",
         email: "carol@example.com",
         count: 0,

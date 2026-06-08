@@ -111,17 +111,17 @@ ENV:
 ```
 === Asana Task Assignee Migration (DRY RUN) ===
 
-Workspace : My Company (gid: 1234567890)
-From      : old.user@example.com (Old User, gid: 111)
-To        : new.user@example.com (New User, gid: 222)  ✓ member of workspace
+Workspace : My Company (gid: 12345678901234)
+From      : old.user@example.com (Old User, gid: 12345678900001)
+To        : new.user@example.com (New User, gid: 12345678900002)  ✓ member of workspace
 
 Discovering incomplete tasks assigned to old.user@example.com...
 Found 47 tasks.
 
-  [ 1] 9876543210  Q2 planning document
-  [ 2] 9876543211  Review onboarding flow
+  [ 1] 12345678900011  Q2 planning document
+  [ 2] 12345678900012  Review onboarding flow
   ...
-  [47] 9876543299  Update docs
+  [47] 12345678900015  Update docs
 
 DRY RUN: no changes were made.
 Re-run without --dry-run to execute migration.
@@ -132,12 +132,12 @@ Re-run without --dry-run to execute migration.
 ```json
 {
   "mode": "dry-run",
-  "workspace": { "gid": "1234567890", "name": "My Company" },
-  "from":      { "email": "old.user@example.com", "gid": "111", "name": "Old User" },
-  "to":        { "email": "new.user@example.com", "gid": "222", "name": "New User", "isMember": true },
+  "workspace": { "gid": "12345678901234", "name": "My Company" },
+  "from":      { "email": "old.user@example.com", "gid": "12345678900001", "name": "Old User" },
+  "to":        { "email": "new.user@example.com", "gid": "12345678900002", "name": "New User", "isMember": true },
   "tasks":     [
-    { "gid": "9876543210", "name": "Q2 planning document" },
-    { "gid": "9876543211", "name": "Review onboarding flow" }
+    { "gid": "12345678900011", "name": "Q2 planning document" },
+    { "gid": "12345678900012", "name": "Review onboarding flow" }
   ],
   "count": 47
 }
@@ -150,17 +150,17 @@ Re-run without --dry-run to execute migration.
 ```
 === Asana Task Assignee Migration ===
 
-Workspace : My Company (gid: 1234567890)
+Workspace : My Company (gid: 12345678901234)
 From      : old.user@example.com → To: new.user@example.com
 
 Discovering tasks... 47 found.
 Migrating 47 tasks...
 
-  [ 1/47] 9876543210  Q2 planning document             ✓
-  [ 2/47] 9876543211  Review onboarding flow           ✓
-  [ 3/47] 9876543212  Bug: search returns 500          ✗ HTTP 403 not_authorized
+  [ 1/47] 12345678900011  Q2 planning document             ✓
+  [ 2/47] 12345678900012  Review onboarding flow           ✓
+  [ 3/47] 12345678900013  Bug: search returns 500          ✗ HTTP 403 not_authorized
   ...
-  [47/47] 9876543299  Update docs                      ✓
+  [47/47] 12345678900015  Update docs                      ✓
 
 Done.
   Total    : 47
@@ -168,8 +168,8 @@ Done.
   Failed   : 2
 
 Failures:
-  9876543212  Bug: search returns 500     HTTP 403 not_authorized
-  9876543220  Production hotfix           HTTP 500 server_error
+  12345678900013  Bug: search returns 500     HTTP 403 not_authorized
+  12345678900014  Production hotfix           HTTP 500 server_error
 
 Re-run the same command to retry failed tasks (idempotent).
 ```
@@ -179,14 +179,14 @@ Re-run the same command to retry failed tasks (idempotent).
 ```json
 {
   "mode": "execute",
-  "workspace": { "gid": "1234567890", "name": "My Company" },
-  "from": { "email": "old.user@example.com", "gid": "111" },
-  "to":   { "email": "new.user@example.com", "gid": "222" },
+  "workspace": { "gid": "12345678901234", "name": "My Company" },
+  "from": { "email": "old.user@example.com", "gid": "12345678900001" },
+  "to":   { "email": "new.user@example.com", "gid": "12345678900002" },
   "summary": { "total": 47, "success": 45, "failed": 2 },
   "results": [
-    { "gid": "9876543210", "name": "Q2 planning document", "status": "success" },
+    { "gid": "12345678900011", "name": "Q2 planning document", "status": "success" },
     {
-      "gid": "9876543212",
+      "gid": "12345678900013",
       "name": "Bug: search returns 500",
       "status": "failed",
       "error": { "httpStatus": 403, "code": "not_authorized", "message": "..." }
@@ -263,7 +263,7 @@ survey OPTIONS:
 
 ```
 === Unmigrated-task survey ===
-workspace : My Company (1234567890)
+workspace : My Company (12345678901234)
 domain    : @example.com
 
 workspace has 714 user(s); 43 match @example.com.
@@ -287,7 +287,7 @@ unmigrated incomplete tasks : 301
 ```json
 {
   "mode": "survey",
-  "workspace": { "gid": "1234567890", "name": "My Company" },
+  "workspace": { "gid": "12345678901234", "name": "My Company" },
   "domain": "example.com",
   "totalUsers": 714,
   "emailInvisibleUsers": 97,
@@ -296,8 +296,8 @@ unmigrated incomplete tasks : 301
   "totalIncompleteTasks": 301,
   "accounts": [
     {
-      "gid": "111", "name": "Alice Example", "email": "alice@example.com", "count": 62,
-      "tasks": [ { "gid": "9876543210", "name": "Q2 planning document", "assigneeGid": "111" } ]
+      "gid": "12345678900001", "name": "Alice Example", "email": "alice@example.com", "count": 62,
+      "tasks": [ { "gid": "12345678900011", "name": "Q2 planning document", "assigneeGid": "12345678900001" } ]
     }
   ],
   "erroredAccounts": 0
@@ -330,8 +330,8 @@ migrate / survey 共通の `--workspace` 値解決ロジック。要件 [R24, R2
 ```
 error: no workspace found for domain "example.com".
   Visible workspaces (use --workspace <gid> directly):
-    1234567890  My Company        [example.com]
-    9876543210  Personal          (not an organization, no domain)
+    12345678901234  My Company        [example.com]
+    12345678905678  Personal          (not an organization, no domain)
 ```
 
 ## リリース自動化仕様（2026-05-31 追加、S-028〜S-032）
