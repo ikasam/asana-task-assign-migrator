@@ -268,6 +268,21 @@
 - **理由**: bump 忘れの失敗モードは「リリースが出ない」だけで安全側に倒れる。B は docs/ci/test-only PR で誤検知が多く、例外運用（C）まで作ると割に合わない。忘れが頻発したら B/C へ昇格する。
 - **関連**: D-021, R30
 
+## 判断 36: CLI パーサを自前維持するか（Cliffy 採用可否）（2026-06-08）
+
+- **背景**: deno-expert 観点の改善レビューで、サブコマンドを持つ自前 CLI パーサ（`src/cli.ts`）を既成ライブラリへ置き換えるべきか再検討した。`@std/cli/parseArgs` はサブコマンド概念を持たず、`string:` 宣言しない限り数値らしい引数を JS number へ強制変換する（大きな GID で精度欠落リスク）うえ、unknown option / required / 値必須を既定で強制しないため、検証層は結局自前に残る（罠の詳細は別途 `deno-cli-pitfalls` skill ルール3 / ikasam/skills#96 に記録）。サブコマンド対応の本格 framework は実質 **Cliffy**（`@cliffy/command`）のみで、2026-06 時点で **1.2.1 stable**（1.0.0 = 2026-02-10）に到達しており「RC で不安定だから避ける」という旧懸念は解消している。
+- **選択肢**: A 自前維持 / B Cliffy へ全面移行 / C `@std/cli/parseArgs` + 自前検証
+- **採択**: **A**（現時点）
+- **理由**:
+  - 現行パーサは動作・テスト済み（`tests/cli.test.ts` 約 25 件）で、サブコマンド分岐・厳密な exit code（0/1/2）・`Unknown option` / `requires a value` 等のエラー語・GID/domain/email 検証・from==to を仕様（S-001 ほか）に沿って実装済み。独自エラー/ヘルプ仕様そのものは「捨ててよい」が、**積極的に捨てる理由も無い**（ユーザー確認 2026-06-08）。
+  - 短命前提（判断 24 / [00_overview.md](00_overview.md)）のツールで、動作中の検証済みコードを idiom 目的だけで書き換えるのは churn。B の LOC 削減は控えめ（トークン化のみ肩代わり・検証層は不変）で、固定済みの error/help/exit semantics をドリフトさせる risk に見合わない。
+  - C は `@std/cli` がサブコマンド非対応で、上記の数値強制変換ケアも新たに要るため、現行からは lateral move。
+- **再採用（Cliffy 移行）の判断基準**: 次のいずれかが具体化したら B を再検討する。
+  - このツールを新規に書き起こす／大幅 refactor する機会が生じた
+  - サブコマンド／オプションが増え、自前の検証・ヘルプ保守が重荷になった
+  - 対話 prompt・シェル補完・table 出力など Cliffy の機能を実際に必要とした
+- **関連**: `src/cli.ts`, `tests/cli.test.ts`, 判断 24（テスト戦略・短命前提）, [S-001](03_specifications.md), `deno-cli-pitfalls` skill ルール3（ikasam/skills#96）
+
 ---
 
 ## 棄却された案の整理（再検討トリガー付き）
@@ -298,6 +313,7 @@
 | tag を version の single source | 判断 33 | tag 起点運用へ切り替える要望 |
 | リリースを ci.yml と並走（品質ゲートなし） | 判断 34 | テスト時間が長くリリースを急ぎたい等で並走を許容 |
 | bump 忘れの CI 強制 | 判断 35 | bump 忘れによるリリース漏れが頻発 |
+| Cliffy 等 CLI framework への移行 | 判断 36（現時点は自前維持） | 新規書き起こし／サブコマンド・オプション増で自前の検証・ヘルプ保守が重荷／対話 prompt・補完・table 出力が必要になったら |
 
 ## 関連
 
