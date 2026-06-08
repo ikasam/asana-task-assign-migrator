@@ -12,6 +12,7 @@
     "fmt:check": "deno fmt --check",
     "lint": "deno lint",
     "check": "deno check src/main.ts src/survey.ts",
+    "notices": "deno install --node-modules-dir=auto --frozen && deno run --allow-read --allow-write scripts/gen_third_party_notices.ts",
     "spike:phase1": "deno run --allow-net --allow-env --allow-read spike/phase1_load.ts",
     "spike:phase2": "deno run --allow-net --allow-env --allow-read spike/phase2_api.ts"
   },
@@ -31,10 +32,10 @@
     "indentWidth": 2,
     "semiColons": true,
     "singleQuote": false,
-    "include": ["src/", "tests/", "spike/"]
+    "include": ["src/", "tests/", "spike/", "scripts/"]
   },
   "lint": {
-    "include": ["src/", "tests/", "spike/"],
+    "include": ["src/", "tests/", "spike/", "scripts/"],
     "rules": {
       "tags": ["recommended"]
     }
