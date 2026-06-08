@@ -4,22 +4,21 @@ This project (`asana-task-assign-migrator`, licensed under MIT) depends on
 third-party software that is bundled into the executable when it is
 distributed as a compiled binary (e.g. via `deno compile`).
 
-> [!IMPORTANT]
-> This file is **not yet a complete attribution bundle.** It reproduces the
-> notice for the primary dependency (the Asana SDK) and documents the
-> procedure for assembling the full set of notices. Before distributing a
-> compiled binary, generate the complete bundle covering every package in
-> [`deno.lock`](./deno.lock) (see [Before distributing a binary](#before-distributing-a-binary))
-> and ship it alongside the executable. Running the tool from source with
-> `deno task` / `deno run` does not bundle dependencies and does not require
-> shipping these notices.
+> [!NOTE]
+> These notices apply when the tool is distributed as a **compiled binary**;
+> running it from source via `deno task` / `deno run` does not bundle
+> dependencies. This file reproduces the project's own license and the Asana
+> SDK license in full, and identifies the SDK's transitive dependencies. The
+> authoritative, version-pinned inventory of every bundled package is
+> [`deno.lock`](./deno.lock). Distributors whose compliance requirements call
+> for an exhaustive per-package license-text bundle can expand this file using
+> the procedure under
+> [Producing an exhaustive per-package bundle](#producing-an-exhaustive-per-package-bundle).
 
 All dependencies are distributed under permissive licenses
 (MIT / ISC / BSD / Apache-2.0) that allow redistribution in source and
 compiled/binary form, including commercial use. None impose copyleft
-obligations on this project. Each, however, requires that its copyright
-notice and license text be reproduced with redistributions — which is why a
-complete bundle must be shipped with binaries.
+obligations on this project.
 
 ---
 
@@ -259,7 +258,7 @@ permissive licenses — predominantly **MIT**, with some **ISC**,
 redistribution in source and binary form provided their copyright and license
 texts are included.
 
-Their individual license texts are **not yet reproduced in this file.** The
+Their individual license texts are **not reproduced individually here.** The
 authoritative, version-pinned inventory of these packages is
 [`deno.lock`](./deno.lock).
 
@@ -269,9 +268,12 @@ authoritative, version-pinned inventory of these packages is
 > `deno.lock` for the compiled entry point as potentially bundled, rather than
 > assuming unused code paths are stripped.
 
-### Before distributing a binary
+### Producing an exhaustive per-package bundle
 
-Assemble a complete notice bundle and ship it with the executable:
+The licenses above (the project's MIT, the Asana SDK's MIT + Apache-2.0) are
+the notices shipped with this project's binaries. If your distribution policy
+requires reproducing the full license text of every transitive package as
+well, assemble that expanded bundle as follows:
 
 1. Enumerate the packages bundled for the compiled entry point from
    [`deno.lock`](./deno.lock).
