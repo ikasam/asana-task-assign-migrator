@@ -1,6 +1,6 @@
 # 06 — 判断履歴
 
-対話中に明示的に分岐させた判断（判断 1 〜 35）の記録。各判断について「選択肢 / 採択 / 理由」を残す。判断 25〜28 は 2026-05-29 の survey サブコマンド追加フェーズ、判断 29〜30 は 2026-05-30 の `--workspace` ドメイン指定フェーズ、判断 31〜35 は 2026-05-31 のリリース自動化フェーズ。
+対話中に明示的に分岐させた判断（判断 1 〜 37）の記録。各判断について「選択肢 / 採択 / 理由」を残す。判断 25〜28 は 2026-05-29 の survey サブコマンド追加フェーズ、判断 29〜30 は 2026-05-30 の `--workspace` ドメイン指定フェーズ、判断 31〜35 は 2026-05-31 のリリース自動化フェーズ、判断 36〜37 は 2026-06-08 の CLI パーサ再検討 / ライセンス付与フェーズ。
 
 ## 判断 1: 「すべての未完了タスク」の境界
 
@@ -283,6 +283,18 @@
   - 対話 prompt・シェル補完・table 出力など Cliffy の機能を実際に必要とした
 - **関連**: `src/cli.ts`, `tests/cli.test.ts`, 判断 24（テスト戦略・短命前提）, [S-001](03_specifications.md), `deno-cli-pitfalls` skill ルール3（ikasam/skills#96）
 
+## 判断 37: ライセンスの付与（MIT 採用 vs JSR 形宣言の撤回）（2026-06-08）
+
+- **背景**: リポジトリ root に LICENSE が無く、`deno.json` にも `license` フィールドが無い一方、`deno.json` は `name` / `version` / `exports` という JSR publish 可能な形を宣言していた（[issue #14](https://github.com/ikasam/asana-task-assign-migrator/issues/14)）。この食い違いにより `deno publish --dry-run` は `error[missing-license]` で失敗する。さらにライセンス不在は法的に "all rights reserved" を意味し、GitHub Releases で配布済みの `deno compile` バイナリに利用許諾が無い hygiene gap になっていた。
+- **選択肢**: A LICENSE 追加（MIT）+ `license` フィールド追加 + README 反映 / B `name` / `exports` を取り下げて JSR 形宣言を撤回し `missing-license` の前提を解消 / C 現状維持
+- **採択**: **A（MIT）**（ユーザー確認 2026-06-08。deno publish 対応は不要との指示のため publish 自体は依然 latent だが、ライセンス付与は実体のある hygiene として実施）
+- **理由**:
+  - 短命な個人ツール（判断 24 / [00_overview.md](00_overview.md)）で、配布バイナリ受領側へ最小摩擦で利用権を付与できる MIT が適合。受領側の利用 / vendor を妨げない。
+  - B は `version` がリリース workflow の SemVer 判定に load-bearing（issue #14 補足・判断 31〜33）なので `name` / `exports` だけ外す形になり、宣言の一貫性をかえって損なう。ライセンス付与という本質的 gap も埋まらない。
+  - 免責は MIT 本文の無保証条項（AS IS）・責任制限条項に内包されるため、別個の免責宣言は作らない（二重定義による解釈衝突を避ける）。README には日本語の可読性のため要約注記のみ添える。
+- **再検討トリガー**: 第三者の contribution を受け入れる / 再利用を積極的に促す段階で、より明示的な許諾範囲（Apache-2.0 の特許条項など）が必要になったら。
+- **関連**: `LICENSE`, `deno.json`（`license`）, README「## ライセンス」, 判断 24（短命前提）, 判断 31〜33（`version` の load-bearing 性）, [issue #14](https://github.com/ikasam/asana-task-assign-migrator/issues/14)
+
 ---
 
 ## 棄却された案の整理（再検討トリガー付き）
@@ -314,6 +326,7 @@
 | リリースを ci.yml と並走（品質ゲートなし） | 判断 34 | テスト時間が長くリリースを急ぎたい等で並走を許容 |
 | bump 忘れの CI 強制 | 判断 35 | bump 忘れによるリリース漏れが頻発 |
 | Cliffy 等 CLI framework への移行 | 判断 36（現時点は自前維持） | 新規書き起こし／サブコマンド・オプション増で自前の検証・ヘルプ保守が重荷／対話 prompt・補完・table 出力が必要になったら |
+| JSR 形宣言（`name` / `exports`）の撤回で `missing-license` を解消 | 判断 37（MIT 付与を採択） | JSR publish を恒久的に断念し `version` も別手段で SemVer 判定できるようになったら |
 
 ## 関連
 
