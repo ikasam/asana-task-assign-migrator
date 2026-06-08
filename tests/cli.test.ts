@@ -27,7 +27,7 @@ Deno.test("migrate: minimal valid run", () => {
   const r = parseArgs([
     "migrate",
     "--workspace",
-    "1234567890",
+    "12345678901234",
     "--from",
     "a@example.com",
     "--to",
@@ -35,7 +35,7 @@ Deno.test("migrate: minimal valid run", () => {
   ]);
   assertEquals(r.kind, "migrate");
   if (r.kind !== "migrate") return;
-  assertEquals(r.args.workspace, "1234567890");
+  assertEquals(r.args.workspace, "12345678901234");
   assertEquals(r.args.from, "a@example.com");
   assertEquals(r.args.to, "b@example.com");
   assertEquals(r.args.dryRun, false);
@@ -44,9 +44,9 @@ Deno.test("migrate: minimal valid run", () => {
 Deno.test("migrate: all flags", () => {
   const r = parseArgs([
     "migrate",
-    "--workspace=1",
-    "--from=a@x.io",
-    "--to=b@x.io",
+    "--workspace=12345678901234",
+    "--from=a@example.com",
+    "--to=b@example.com",
     "--dry-run",
     "--json",
     "--quiet",
@@ -66,7 +66,7 @@ Deno.test("migrate: --help → help with topic", () => {
 Deno.test("migrate: missing required throws", () => {
   assertThrows(() => parseArgs(["migrate"]), CliUsageError, "Missing required option");
   assertThrows(
-    () => parseArgs(["migrate", "--workspace", "1", "--from", "a@b.c"]),
+    () => parseArgs(["migrate", "--workspace", "12345678901234", "--from", "a@example.com"]),
     CliUsageError,
     "--to",
   );
@@ -75,7 +75,16 @@ Deno.test("migrate: missing required throws", () => {
 Deno.test("migrate: workspace rejects non-gid non-domain", () => {
   // "abc" is neither a numeric GID nor a valid domain (no dot) → rejected.
   assertThrows(
-    () => parseArgs(["migrate", "--workspace", "abc", "--from", "a@b.c", "--to", "c@d.e"]),
+    () =>
+      parseArgs([
+        "migrate",
+        "--workspace",
+        "abc",
+        "--from",
+        "a@example.com",
+        "--to",
+        "c@example.com",
+      ]),
     CliUsageError,
     "Invalid --workspace",
   );
@@ -100,24 +109,42 @@ Deno.test("migrate: workspace keeps a numeric gid as-is", () => {
   const r = parseArgs([
     "migrate",
     "--workspace",
-    "1234567890",
+    "12345678901234",
     "--from",
     "a@example.com",
     "--to",
     "b@example.com",
   ]);
   if (r.kind !== "migrate") throw new Error("expected migrate");
-  assertEquals(r.args.workspace, "1234567890");
+  assertEquals(r.args.workspace, "12345678901234");
 });
 
 Deno.test("migrate: email format enforced", () => {
   assertThrows(
-    () => parseArgs(["migrate", "--workspace", "1", "--from", "not-email", "--to", "c@d.e"]),
+    () =>
+      parseArgs([
+        "migrate",
+        "--workspace",
+        "12345678901234",
+        "--from",
+        "not-email",
+        "--to",
+        "c@example.com",
+      ]),
     CliUsageError,
     "Invalid --from",
   );
   assertThrows(
-    () => parseArgs(["migrate", "--workspace", "1", "--from", "a@b.c", "--to", "nope"]),
+    () =>
+      parseArgs([
+        "migrate",
+        "--workspace",
+        "12345678901234",
+        "--from",
+        "a@example.com",
+        "--to",
+        "nope",
+      ]),
     CliUsageError,
     "Invalid --to",
   );
@@ -125,7 +152,16 @@ Deno.test("migrate: email format enforced", () => {
 
 Deno.test("migrate: from == to rejected", () => {
   assertThrows(
-    () => parseArgs(["migrate", "--workspace", "1", "--from", "A@X.io", "--to", "a@x.io"]),
+    () =>
+      parseArgs([
+        "migrate",
+        "--workspace",
+        "12345678901234",
+        "--from",
+        "A@example.com",
+        "--to",
+        "a@example.com",
+      ]),
     CliUsageError,
     "must differ",
   );
@@ -133,7 +169,17 @@ Deno.test("migrate: from == to rejected", () => {
 
 Deno.test("migrate: unknown option rejected", () => {
   assertThrows(
-    () => parseArgs(["migrate", "--workspace", "1", "--from", "a@b.c", "--to", "c@d.e", "--bogus"]),
+    () =>
+      parseArgs([
+        "migrate",
+        "--workspace",
+        "12345678901234",
+        "--from",
+        "a@example.com",
+        "--to",
+        "c@example.com",
+        "--bogus",
+      ]),
     CliUsageError,
     "Unknown option",
   );
@@ -141,7 +187,7 @@ Deno.test("migrate: unknown option rejected", () => {
 
 Deno.test("migrate: flag without value rejected", () => {
   assertThrows(
-    () => parseArgs(["migrate", "--workspace", "--from", "a@b.c", "--to", "c@d.e"]),
+    () => parseArgs(["migrate", "--workspace", "--from", "a@example.com", "--to", "c@example.com"]),
     CliUsageError,
     "requires a value",
   );
@@ -150,10 +196,10 @@ Deno.test("migrate: flag without value rejected", () => {
 // ---- survey subcommand ----
 
 Deno.test("survey: minimal valid", () => {
-  const r = parseArgs(["survey", "--workspace", "1234567890", "--domain", "example.com"]);
+  const r = parseArgs(["survey", "--workspace", "12345678901234", "--domain", "example.com"]);
   assertEquals(r.kind, "survey");
   if (r.kind !== "survey") return;
-  assertEquals(r.args.workspace, "1234567890");
+  assertEquals(r.args.workspace, "12345678901234");
   assertEquals(r.args.domain, "example.com");
   assertEquals(r.args.json, false);
   assertEquals(r.args.quiet, false);
@@ -162,7 +208,7 @@ Deno.test("survey: minimal valid", () => {
 Deno.test("survey: flags + equals form + lowercasing", () => {
   const r = parseArgs([
     "survey",
-    "--workspace=1",
+    "--workspace=12345678901234",
     "--domain=Example.COM",
     "--json",
     "--verbose",
@@ -174,7 +220,7 @@ Deno.test("survey: flags + equals form + lowercasing", () => {
 });
 
 Deno.test("survey: leading @ stripped from domain", () => {
-  const r = parseArgs(["survey", "--workspace", "1", "--domain", "@example.com"]);
+  const r = parseArgs(["survey", "--workspace", "12345678901234", "--domain", "@example.com"]);
   if (r.kind !== "survey") throw new Error("expected survey");
   assertEquals(r.args.domain, "example.com");
 });
@@ -182,7 +228,7 @@ Deno.test("survey: leading @ stripped from domain", () => {
 Deno.test("survey: missing required throws", () => {
   assertThrows(() => parseArgs(["survey"]), CliUsageError, "Missing required option");
   assertThrows(
-    () => parseArgs(["survey", "--workspace", "1"]),
+    () => parseArgs(["survey", "--workspace", "12345678901234"]),
     CliUsageError,
     "--domain",
   );
@@ -205,9 +251,9 @@ Deno.test("survey: workspace accepts a domain (normalized)", () => {
 });
 
 Deno.test("survey: invalid domain rejected", () => {
-  for (const bad of ["nodot", "bad@domain.com", "trailing.", ".leading", "has space.com"]) {
+  for (const bad of ["nodot", "bad@example.com", "trailing.", ".leading", "has space.com"]) {
     assertThrows(
-      () => parseArgs(["survey", "--workspace", "1", "--domain", bad]),
+      () => parseArgs(["survey", "--workspace", "12345678901234", "--domain", bad]),
       CliUsageError,
       "Invalid --domain",
     );
@@ -216,7 +262,16 @@ Deno.test("survey: invalid domain rejected", () => {
 
 Deno.test("survey: migrate-only flags rejected", () => {
   assertThrows(
-    () => parseArgs(["survey", "--workspace", "1", "--domain", "example.com", "--from", "a@b.c"]),
+    () =>
+      parseArgs([
+        "survey",
+        "--workspace",
+        "12345678901234",
+        "--domain",
+        "example.com",
+        "--from",
+        "a@example.com",
+      ]),
     CliUsageError,
     "Unknown option",
   );
