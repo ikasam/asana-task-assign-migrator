@@ -9,11 +9,11 @@ distributed as a compiled binary (e.g. via `deno compile`).
 > running it from source via `deno task` / `deno run` does not bundle
 > dependencies. This file reproduces the project's own license and the Asana
 > SDK license in full, and identifies the SDK's transitive dependencies. The
-> authoritative, version-pinned inventory of every bundled package is
-> [`deno.lock`](./deno.lock). Distributors whose compliance requirements call
-> for an exhaustive per-package license-text bundle can expand this file using
-> the procedure under
-> [Producing an exhaustive per-package bundle](#producing-an-exhaustive-per-package-bundle).
+> authoritative, version-pinned inventory of every bundled npm package is
+> [`deno.lock`](./deno.lock); compiled binaries additionally embed the Deno
+> runtime (see [Deno runtime](#deno-runtime-compiled-binaries-only)).
+> Distributors whose compliance requirements call for an exhaustive
+> license-text bundle can expand this file using the procedures below.
 
 All dependencies are distributed under permissive licenses
 (MIT / ISC / BSD / Apache-2.0) that allow redistribution in source and
@@ -281,3 +281,24 @@ well, assemble that expanded bundle as follows:
    npm registry entry or source repository.
 3. Concatenate those into the notice bundle (this file, or a generated
    `THIRD-PARTY-NOTICES` artifact) shipped next to the binary.
+
+---
+
+## Deno runtime (compiled binaries only)
+
+A binary produced by `deno compile` embeds a slimmed-down copy of the Deno
+runtime alongside the application code, so the executable also carries
+software outside the npm dependency graph — the Deno runtime itself (MIT
+licensed) and its native components (e.g. the V8 JavaScript engine under
+BSD-3-Clause and numerous Rust crates under MIT / Apache-2.0 / BSD). This
+applies only to compiled binaries; running from source via `deno task` /
+`deno run` uses the locally installed Deno and bundles none of this.
+
+These runtime components are **not reproduced here.** Deno publishes the
+authoritative third-party license list for the runtime at
+https://license.deno.dev/ (see also the
+[`deno compile` docs](https://docs.deno.com/runtime/reference/cli/compile/)).
+A distribution policy that requires reproducing the full text of every
+embedded component should include that runtime license list — pinned to the
+Deno version used for the build (`mise.toml`) — alongside the npm notices
+produced by the procedure above.
